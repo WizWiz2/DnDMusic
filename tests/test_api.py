@@ -19,7 +19,7 @@ def test_health_endpoint(monkeypatch) -> None:
     monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
     _reset_caches()
     client = TestClient(app)
-    response = client.get("/")
+    response = client.get("/api/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
@@ -81,19 +81,51 @@ def test_ui_page(monkeypatch) -> None:
     monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
     _reset_caches()
     client = TestClient(app)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    body = response.text
+    assert "RPG Auto-DJ" in body
+
+    script_match = re.search(
+        r"<script id=\"initial-data\" type=\"application/json\">(.*?)</script>",
+        body,
+        re.S,
+    )
+    assert script_match is not None, "initialData payload is not embedded in the page"
+
+    payload_raw = script_match.group(1)
+    payload = json.loads(payload_raw)
+    assert payload["genres"], "Список жанров должен быть заполнен"
+    assert "scenes" in payload and payload["scenes"], "Ожидаем метаданные сцен"
+    assert "hysteresis" in payload and payload["hysteresis"], "Должны быть настройки антидребезга"
+
+    # Проверяем, что опасные последовательности экранированы и не ломают <script>.
+    assert "</script" not in payload_raw
+
+
+def test_ui_page_legacy_path(monkeypatch) -> None:
+    monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+    _reset_caches()
+    client = TestClient(app)
     response = client.get("/ui")
     assert response.status_code == 200
     assert "text/html" in response.headers.get("content-type", "")
     body = response.text
     assert "RPG Auto-DJ" in body
 
-    match = re.search(r"const initialData = (.*?);", body, re.S)
-    assert match is not None, "initialData payload is not embedded in the page"
+    script_match = re.search(
+        r"<script id=\"initial-data\" type=\"application/json\">(.*?)</script>",
+        body,
+        re.S,
+    )
+    assert script_match is not None, "initialData payload is not embedded in the page"
 
-    payload = json.loads(match.group(1))
+    payload_raw = script_match.group(1)
+    payload = json.loads(payload_raw)
     assert payload["genres"], "Список жанров должен быть заполнен"
     assert "scenes" in payload and payload["scenes"], "Ожидаем метаданные сцен"
     assert "hysteresis" in payload and payload["hysteresis"], "Должны быть настройки антидребезга"
 
     # Проверяем, что опасные последовательности экранированы и не ломают <script>.
-    assert "</script" not in match.group(1)
+    assert "</script" not in payload_raw

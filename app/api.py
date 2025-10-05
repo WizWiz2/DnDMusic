@@ -84,22 +84,7 @@ def get_service() -> MusicService:
     return get_service_cached()
 
 
-@app.get("/", response_model=HealthStatus)
-async def health(service: MusicService = Depends(get_service)) -> HealthStatus:
-    return HealthStatus(genres=list(service.available_genres()))
-
-
-@app.head("/")
-async def health_head(service: MusicService = Depends(get_service)) -> Response:
-    """Lightweight HEAD variant of the health endpoint for platform probes."""
-
-    # Touch the service so dependency validation matches the GET handler.
-    service.available_genres()
-    return Response(status_code=200)
-
-
-@app.get("/ui", response_class=HTMLResponse)
-async def ui(service: MusicService = Depends(get_service)) -> HTMLResponse:
+def _build_ui_response(service: MusicService) -> HTMLResponse:
     genres = list(service.available_genres())
     scene_library = service.describe_scenes()
     hysteresis = service.hysteresis_settings()
@@ -111,6 +96,32 @@ async def ui(service: MusicService = Depends(get_service)) -> HTMLResponse:
     }
     rendered = _render_ui(initial_data)
     return HTMLResponse(content=rendered)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def ui_root(service: MusicService = Depends(get_service)) -> HTMLResponse:
+    """Serve the interactive UI from the site root."""
+
+    return _build_ui_response(service)
+
+
+@app.get("/ui", response_class=HTMLResponse)
+async def ui(service: MusicService = Depends(get_service)) -> HTMLResponse:
+    return _build_ui_response(service)
+
+
+@app.get("/api/health", response_model=HealthStatus)
+async def health(service: MusicService = Depends(get_service)) -> HealthStatus:
+    return HealthStatus(genres=list(service.available_genres()))
+
+
+@app.head("/api/health")
+async def health_head(service: MusicService = Depends(get_service)) -> Response:
+    """Lightweight HEAD variant of the health endpoint for platform probes."""
+
+    # Touch the service so dependency validation matches the GET handler.
+    service.available_genres()
+    return Response(status_code=200)
 
 
 @app.get("/api/search", response_model=SearchResult)
