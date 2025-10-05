@@ -1,3 +1,6 @@
+import json
+import re
+
 from fastapi.testclient import TestClient
 
 from app.api import app, get_ai_client, get_config, get_service, get_service_cached
@@ -83,5 +86,14 @@ def test_ui_page(monkeypatch) -> None:
     assert "text/html" in response.headers.get("content-type", "")
     body = response.text
     assert "RPG Auto-DJ" in body
-    # embedded JSON with genres should be present in the page
-    assert "initialData" in body
+
+    match = re.search(r"const initialData = (.*?);", body, re.S)
+    assert match is not None, "initialData payload is not embedded in the page"
+
+    payload = json.loads(match.group(1))
+    assert payload["genres"], "Список жанров должен быть заполнен"
+    assert "scenes" in payload and payload["scenes"], "Ожидаем метаданные сцен"
+    assert "hysteresis" in payload and payload["hysteresis"], "Должны быть настройки антидребезга"
+
+    # Проверяем, что опасные последовательности экранированы и не ломают <script>.
+    assert "</script" not in match.group(1)
