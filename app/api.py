@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 
 from .config import load_config
 from .models import (
@@ -23,6 +25,8 @@ from .ai_client import NeuralTaggerClient
 
 
 app = FastAPI(title="DnD Music Tool", version="0.1.0")
+
+templates = Jinja2Templates(directory="app/templates")
 
 
 @lru_cache(maxsize=1)
@@ -47,6 +51,29 @@ def get_service() -> MusicService:
 @app.get("/", response_model=HealthStatus)
 async def health(service: MusicService = Depends(get_service)) -> HealthStatus:
     return HealthStatus(genres=list(service.available_genres()))
+
+
+@app.get("/ui", response_class=HTMLResponse)
+async def ui(
+    request: Request, service: MusicService = Depends(get_service)
+) -> HTMLResponse:
+    genres = list(service.available_genres())
+    scene_library = service.describe_scenes()
+    hysteresis = service.hysteresis_settings()
+
+    initial_data = {
+        "genres": genres,
+        "scenes": scene_library,
+        "hysteresis": hysteresis,
+    }
+
+    return templates.TemplateResponse(
+        request,
+        "ui.html",
+        {
+            "initial_data": initial_data,
+        },
+    )
 
 
 @app.get("/api/search", response_model=SearchResult)

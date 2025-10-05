@@ -72,3 +72,16 @@ def test_recommend_endpoint(monkeypatch) -> None:
         assert payload["reason"] == "stub"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_ui_page(monkeypatch) -> None:
+    monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+    _reset_caches()
+    client = TestClient(app)
+    response = client.get("/ui")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    body = response.text
+    assert "RPG Auto-DJ" in body
+    # embedded JSON with genres should be present in the page
+    assert "initialData" in body

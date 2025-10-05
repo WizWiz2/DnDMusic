@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RPG Auto-DJ</title>
+    <style>
+      :root {
+        --bg-start: #d1fae5;
+        --bg-middle: #a7f3d0;
+        --bg-end: #6ee7b7;
+        --card-bg: rgba(255, 255, 255, 0.82);
+        --card-border: rgba(255, 255, 255, 0.65);
+        --accent: #047857;
+        --accent-contrast: #ffffff;
+        --text-primary: #1f2937;
+        --text-secondary: #4b5563;
+        --shadow-sm: 0 10px 35px rgba(15, 23, 42, 0.12);
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text-primary);
+        background: linear-gradient(180deg, var(--bg-start), var(--bg-middle), var(--bg-end));
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      header {
+        position: sticky;
+        top: 0;
+        backdrop-filter: blur(14px);
+        background: rgba(255, 255, 255, 0.78);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.65);
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+        z-index: 10;
+      }
+
+      header .wrap,
+      main,
+      footer {
+        width: min(1180px, 100%);
+        margin: 0 auto;
+        padding: 18px 20px;
+      }
+
+      header .wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      header h1 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      header nav {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 0.92rem;
+      }
+
+      main {
+        display: grid;
+        gap: 28px;
+      }
+
+      @media (min-width: 960px) {
+        main {
+          grid-template-columns: 360px 1fr;
+        }
+      }
+
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 18px;
+        padding: 22px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .card h2 {
+        font-size: 1.05rem;
+        margin: 0 0 18px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      label {
+        font-size: 0.82rem;
+        font-weight: 600;
+        display: block;
+        margin-bottom: 6px;
+        color: var(--text-secondary);
+      }
+
+      select,
+      input[type="text"] {
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.92);
+        padding: 10px 14px;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+        box-shadow: inset 0 0 0 rgba(0, 0, 0, 0);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      select:focus,
+      input[type="text"]:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
+      }
+
+      .button,
+      button {
+        appearance: none;
+        border: none;
+        border-radius: 999px;
+        padding: 10px 18px;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        color: var(--accent-contrast);
+        background: var(--accent);
+        box-shadow: 0 10px 25px rgba(15, 118, 110, 0.3);
+      }
+
+      .button:disabled,
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+        box-shadow: none;
+      }
+
+      .button.secondary {
+        background: transparent;
+        color: var(--text-primary);
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        box-shadow: none;
+      }
+
+      .button.secondary:hover {
+        border-color: rgba(15, 23, 42, 0.25);
+        background: rgba(255, 255, 255, 0.8);
+      }
+
+      .button:hover,
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 35px rgba(15, 118, 110, 0.25);
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .form-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+
+      .scene-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .scene-chip {
+        padding: 8px 14px;
+        border-radius: 999px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.72);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+      }
+
+      .scene-chip:hover {
+        transform: translateY(-1px);
+        border-color: var(--accent);
+      }
+
+      .scene-chip.active {
+        background: var(--accent);
+        color: var(--accent-contrast);
+        border-color: transparent;
+        box-shadow: 0 10px 25px rgba(15, 118, 110, 0.35);
+      }
+
+      .status {
+        margin: 0;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+      }
+
+      .result-card {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .result-header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: baseline;
+      }
+
+      .result-header h2 {
+        margin: 0;
+        font-size: 1.35rem;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        background: rgba(15, 118, 110, 0.12);
+        color: var(--accent);
+      }
+
+      .result-body {
+        display: grid;
+        gap: 22px;
+      }
+
+      @media (min-width: 840px) {
+        .result-body {
+          grid-template-columns: 1.2fr 1fr;
+        }
+      }
+
+      .info-block {
+        background: rgba(255, 255, 255, 0.72);
+        border-radius: 16px;
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+      }
+
+      .info-block h3 {
+        margin: 0 0 10px;
+        font-size: 1rem;
+      }
+
+      .info-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 8px;
+      }
+
+      .info-list li {
+        font-size: 0.92rem;
+        color: var(--text-secondary);
+      }
+
+      .playlist-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+      }
+
+      .playlist-list li {
+        background: rgba(255, 255, 255, 0.72);
+        border-radius: 14px;
+        padding: 14px 16px;
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        display: grid;
+        gap: 4px;
+      }
+
+      .playlist-list a {
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--accent);
+      }
+
+      .playlist-list small {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+      }
+
+      .hidden {
+        display: none !important;
+      }
+
+      footer {
+        padding-top: 0;
+        padding-bottom: 40px;
+        text-align: center;
+        font-size: 0.78rem;
+        color: rgba(15, 23, 42, 0.7);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <h1>🪄 RPG Auto-DJ</h1>
+        <nav>
+          <a href="/docs" target="_blank" rel="noopener">API docs</a>
+          <a href="https://github.com/" target="_blank" rel="noopener">GitHub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Жанр и сцены</h2>
+        <div class="form-grid">
+          <div>
+            <label for="genre-select">Жанр кампании</label>
+            <select id="genre-select"></select>
+          </div>
+          <div>
+            <label for="scene-select">Сцена</label>
+            <select id="scene-select"></select>
+          </div>
+          <div class="form-actions">
+            <button id="search-button" type="button">Подобрать музыку</button>
+            <span class="status" id="search-status">Выберите сцену, чтобы получить ссылки на плейлисты.</span>
+          </div>
+        </div>
+
+        <h2>Быстрый выбор сцены</h2>
+        <div class="scene-list" id="scene-buttons"></div>
+      </section>
+
+      <section class="card">
+        <div class="result-card">
+          <p class="status" id="result-status">Здесь появится подборка плейлистов для вашей сцены.</p>
+          <div id="result-container" class="hidden">
+            <div class="result-header">
+              <h2 id="result-title">Текущая сцена</h2>
+              <span class="pill" id="result-genre"></span>
+              <span class="pill" id="result-scene"></span>
+              <span class="pill hidden" id="result-confidence"></span>
+            </div>
+            <div class="result-body">
+              <div class="info-block">
+                <h3>Детали сцены</h3>
+                <ul class="info-list" id="scene-config"></ul>
+                <div id="result-tags" class="status hidden"></div>
+                <div id="result-reason" class="status hidden"></div>
+              </div>
+              <div>
+                <div class="info-block">
+                  <h3>Поисковый запрос</h3>
+                  <p id="result-query" class="status"></p>
+                </div>
+                <div class="info-block">
+                  <h3>Плейлисты</h3>
+                  <ul class="playlist-list" id="playlist-list"></ul>
+                </div>
+                <div class="info-block">
+                  <h3>Антидребезг</h3>
+                  <ul class="info-list" id="hysteresis-list"></ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Автоподбор по тегам</h2>
+        <div class="form-grid">
+          <div>
+            <label for="recommend-genre">Жанр</label>
+            <select id="recommend-genre"></select>
+          </div>
+          <div>
+            <label for="recommend-tags">Теги (через запятую)</label>
+            <input id="recommend-tags" type="text" placeholder="battle, dragons" />
+          </div>
+          <div class="form-actions">
+            <button id="recommend-button" type="button">Рекомендовать сцену</button>
+            <span class="status" id="recommend-status">Опишите ситуацию — система предложит сцену автоматически.</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Макет адаптируется под жанр: фэнтези — зелёные оттенки, киберпанк — неоновые, sci-fi — холодные, хоррор — тёмно-красные.
+    </footer>
+
+    <script>
+      const initialData = {{ initial_data | tojson | safe }};
+
+      const THEMES = {
+        fantasy: {
+          gradient: ["#d1fae5", "#a7f3d0", "#6ee7b7"],
+          card: "rgba(255, 255, 255, 0.82)",
+          border: "rgba(16, 185, 129, 0.25)",
+          accent: "#047857",
+          accentContrast: "#ffffff",
+        },
+        cyberpunk: {
+          gradient: ["#f5d0ff", "#e0aaff", "#5eead4"],
+          card: "rgba(255, 255, 255, 0.85)",
+          border: "rgba(168, 85, 247, 0.35)",
+          accent: "#7c3aed",
+          accentContrast: "#ffffff",
+        },
+        scifi: {
+          gradient: ["#dbeafe", "#bfdbfe", "#c4b5fd"],
+          card: "rgba(255, 255, 255, 0.88)",
+          border: "rgba(59, 130, 246, 0.28)",
+          accent: "#2563eb",
+          accentContrast: "#ffffff",
+        },
+        modern: {
+          gradient: ["#f5f5f5", "#e5e7eb", "#d1d5db"],
+          card: "rgba(255, 255, 255, 0.9)",
+          border: "rgba(55, 65, 81, 0.2)",
+          accent: "#1f2937",
+          accentContrast: "#ffffff",
+        },
+        horror: {
+          gradient: ["#fee2e2", "#fecaca", "#9ca3af"],
+          card: "rgba(255, 255, 255, 0.82)",
+          border: "rgba(185, 28, 28, 0.3)",
+          accent: "#991b1b",
+          accentContrast: "#ffffff",
+        },
+        default: {
+          gradient: ["#f3f4f6", "#e5e7eb", "#d1d5db"],
+          card: "rgba(255, 255, 255, 0.85)",
+          border: "rgba(148, 163, 184, 0.25)",
+          accent: "#0f172a",
+          accentContrast: "#ffffff",
+        },
+      };
+
+      const state = {
+        genre: initialData.genres[0] || null,
+        scene: null,
+      };
+
+      const genreSelect = document.getElementById("genre-select");
+      const sceneSelect = document.getElementById("scene-select");
+      const sceneButtonsWrap = document.getElementById("scene-buttons");
+      const searchButton = document.getElementById("search-button");
+      const searchStatus = document.getElementById("search-status");
+      const resultStatus = document.getElementById("result-status");
+      const resultContainer = document.getElementById("result-container");
+      const resultTitle = document.getElementById("result-title");
+      const resultGenre = document.getElementById("result-genre");
+      const resultScene = document.getElementById("result-scene");
+      const resultConfidence = document.getElementById("result-confidence");
+      const resultQuery = document.getElementById("result-query");
+      const playlistList = document.getElementById("playlist-list");
+      const sceneConfigList = document.getElementById("scene-config");
+      const hysteresisList = document.getElementById("hysteresis-list");
+      const recommendGenre = document.getElementById("recommend-genre");
+      const recommendTags = document.getElementById("recommend-tags");
+      const recommendButton = document.getElementById("recommend-button");
+      const recommendStatus = document.getElementById("recommend-status");
+      const tagsRow = document.getElementById("result-tags");
+      const reasonRow = document.getElementById("result-reason");
+
+      function formatLabel(value) {
+        return value
+          .split("_")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ");
+      }
+
+      function applyTheme(genre) {
+        const theme = THEMES[genre] || THEMES.default;
+        document.documentElement.style.setProperty("--bg-start", theme.gradient[0]);
+        document.documentElement.style.setProperty("--bg-middle", theme.gradient[1]);
+        document.documentElement.style.setProperty("--bg-end", theme.gradient[2]);
+        document.documentElement.style.setProperty("--card-bg", theme.card);
+        document.documentElement.style.setProperty("--card-border", theme.border);
+        document.documentElement.style.setProperty("--accent", theme.accent);
+        document.documentElement.style.setProperty("--accent-contrast", theme.accentContrast);
+      }
+
+      function populateGenres(select) {
+        select.innerHTML = "";
+        initialData.genres.forEach((genre) => {
+          const option = document.createElement("option");
+          option.value = genre;
+          option.textContent = formatLabel(genre);
+          select.append(option);
+        });
+      }
+
+      function getSceneMeta(genre, scene) {
+        const list = initialData.scenes[genre] || [];
+        return list.find((entry) => entry.id === scene) || null;
+      }
+
+      function populateScenes(genre) {
+        const scenes = initialData.scenes[genre] || [];
+        sceneSelect.innerHTML = "";
+        scenes.forEach((scene, index) => {
+          const option = document.createElement("option");
+          option.value = scene.id;
+          option.textContent = scene.name;
+          if (index === 0 && !state.scene) {
+            option.selected = true;
+            state.scene = scene.id;
+          }
+          sceneSelect.append(option);
+        });
+
+        if (scenes.length > 0 && !state.scene) {
+          state.scene = scenes[0].id;
+        }
+
+        if (state.scene) {
+          sceneSelect.value = state.scene;
+        }
+
+        if (!scenes.length) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "Нет сцен";
+          sceneSelect.append(option);
+        }
+      }
+
+      function renderSceneButtons(genre) {
+        sceneButtonsWrap.innerHTML = "";
+        const scenes = initialData.scenes[genre] || [];
+        scenes.forEach((scene) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "scene-chip" + (scene.id === state.scene ? " active" : "");
+          button.dataset.scene = scene.id;
+          button.textContent = scene.name;
+          button.addEventListener("click", () => {
+            state.scene = scene.id;
+            sceneSelect.value = scene.id;
+            updateSceneButtonsHighlight();
+            runSearch(scene.id);
+          });
+          sceneButtonsWrap.append(button);
+        });
+        updateSceneButtonsHighlight();
+      }
+
+      function updateSceneButtonsHighlight() {
+        document.querySelectorAll(".scene-chip").forEach((btn) => {
+          btn.classList.toggle("active", btn.dataset.scene === state.scene);
+        });
+      }
+
+      function renderHysteresis(data) {
+        hysteresisList.innerHTML = "";
+        const entries = [
+          ["Минимальная уверенность", data.min_confidence],
+          ["Окно (сек)", data.window_sec],
+          ["Кулдаун (сек)", data.cooldown_sec],
+        ];
+        entries.forEach(([label, value]) => {
+          const li = document.createElement("li");
+          li.textContent = `${label}: ${value}`;
+          hysteresisList.append(li);
+        });
+      }
+
+      function renderSceneConfig(meta) {
+        sceneConfigList.innerHTML = "";
+        if (!meta) {
+          const li = document.createElement("li");
+          li.textContent = "Нет дополнительной информации о сцене";
+          sceneConfigList.append(li);
+          return;
+        }
+
+        const fields = [];
+        if (meta.volume !== null && meta.volume !== undefined) {
+          fields.push(["Рекомендуемая громкость", `${meta.volume}%`]);
+        }
+        if (meta.crossfade !== null && meta.crossfade !== undefined) {
+          fields.push(["Кроссфейд", `${meta.crossfade} с`]);
+        }
+        if (meta.cooldown_sec !== null && meta.cooldown_sec !== undefined) {
+          fields.push(["Рекомендованный кулдаун", `${meta.cooldown_sec} с`]);
+        }
+        if (meta.providers && meta.providers.length) {
+          fields.push([
+            "Провайдеры",
+            meta.providers.map((p) => p.name).join(", "),
+          ]);
+        }
+
+        if (!fields.length) {
+          const li = document.createElement("li");
+          li.textContent = "Для сцены нет дополнительных параметров";
+          sceneConfigList.append(li);
+          return;
+        }
+
+        fields.forEach(([label, value]) => {
+          const li = document.createElement("li");
+          li.textContent = `${label}: ${value}`;
+          sceneConfigList.append(li);
+        });
+      }
+
+      function renderPlaylists(playlists) {
+        playlistList.innerHTML = "";
+        if (!playlists || !playlists.length) {
+          const li = document.createElement("li");
+          li.textContent = "Плейлисты не найдены.";
+          playlistList.append(li);
+          return;
+        }
+
+        playlists.forEach((playlist) => {
+          const li = document.createElement("li");
+          const link = document.createElement("a");
+          link.href = playlist.url;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.textContent = playlist.provider;
+          li.append(link);
+          if (playlist.description) {
+            const desc = document.createElement("small");
+            desc.textContent = playlist.description;
+            li.append(desc);
+          }
+          playlistList.append(li);
+        });
+      }
+
+      function showResult(result, meta, type) {
+        resultStatus.textContent = "";
+        resultContainer.classList.remove("hidden");
+        resultTitle.textContent = type === "recommend" ? "Рекомендованная сцена" : "Подбор плейлистов";
+        resultGenre.textContent = `Жанр: ${formatLabel(result.genre)}`;
+        resultScene.textContent = `Сцена: ${formatLabel(result.scene)}`;
+        resultQuery.textContent = result.query;
+        renderSceneConfig(meta);
+        renderPlaylists(result.playlists || []);
+        renderHysteresis(result.hysteresis || {});
+
+        if (Array.isArray(result.tags)) {
+          tagsRow.textContent = `Теги: ${result.tags.join(", ")}`;
+          tagsRow.classList.remove("hidden");
+        } else {
+          tagsRow.classList.add("hidden");
+        }
+
+        if (result.reason) {
+          reasonRow.textContent = `Причина: ${result.reason}`;
+          reasonRow.classList.remove("hidden");
+        } else {
+          reasonRow.classList.add("hidden");
+        }
+
+        if (typeof result.confidence === "number") {
+          const percent = Math.round(result.confidence * 100);
+          resultConfidence.textContent = `Уверенность: ${percent}%`;
+          resultConfidence.classList.remove("hidden");
+        } else {
+          resultConfidence.classList.add("hidden");
+        }
+      }
+
+      async function runSearch(sceneOverride) {
+        if (!state.genre) {
+          searchStatus.textContent = "Сначала выберите жанр.";
+          return;
+        }
+        const scene = sceneOverride || sceneSelect.value;
+        if (!scene) {
+          searchStatus.textContent = "Для жанра нет сцен.";
+          return;
+        }
+
+        searchStatus.textContent = "Загружаем варианты…";
+        searchButton.disabled = true;
+        try {
+          const params = new URLSearchParams({ genre: state.genre, scene });
+          const response = await fetch(`/api/search?${params.toString()}`);
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.detail || "Не удалось получить плейлисты");
+          }
+          const result = await response.json();
+          state.scene = result.scene;
+          updateSceneButtonsHighlight();
+          const meta = getSceneMeta(state.genre, result.scene);
+          showResult(result, meta, "search");
+          searchStatus.textContent = "Плейлисты обновлены.";
+        } catch (error) {
+          console.error(error);
+          searchStatus.textContent = error.message;
+        } finally {
+          searchButton.disabled = false;
+        }
+      }
+
+      async function runRecommend() {
+        const genre = recommendGenre.value;
+        const tags = recommendTags.value
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean);
+
+        if (!genre) {
+          recommendStatus.textContent = "Выберите жанр для рекомендации.";
+          return;
+        }
+        if (!tags.length) {
+          recommendStatus.textContent = "Добавьте хотя бы один тег.";
+          return;
+        }
+
+        recommendButton.disabled = true;
+        recommendStatus.textContent = "Запрашиваем сцену у нейросети…";
+        try {
+          const response = await fetch("/api/recommend", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ genre, tags }),
+          });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.detail || "Рекомендация недоступна");
+          }
+          const result = await response.json();
+          state.genre = result.genre;
+          applyTheme(state.genre);
+          genreSelect.value = state.genre;
+          recommendGenre.value = state.genre;
+          populateScenes(state.genre);
+          sceneSelect.value = result.scene;
+          renderSceneButtons(state.genre);
+          updateSceneButtonsHighlight();
+          const meta = getSceneMeta(state.genre, result.scene);
+          showResult(result, meta, "recommend");
+          recommendStatus.textContent = "Готово! Сцена подобрана автоматически.";
+        } catch (error) {
+          console.error(error);
+          recommendStatus.textContent = error.message;
+        } finally {
+          recommendButton.disabled = false;
+        }
+      }
+
+      function initialise() {
+        if (!initialData.genres.length) {
+          searchStatus.textContent = "Не удалось загрузить жанры. Проверьте конфигурацию.";
+          recommendStatus.textContent = "Рекомендации недоступны — нет жанров.";
+          searchButton.disabled = true;
+          recommendButton.disabled = true;
+          return;
+        }
+
+        populateGenres(genreSelect);
+        populateGenres(recommendGenre);
+
+        if (!state.genre) {
+          state.genre = initialData.genres[0];
+        }
+        genreSelect.value = state.genre;
+        recommendGenre.value = state.genre;
+
+        applyTheme(state.genre);
+        populateScenes(state.genre);
+        renderSceneButtons(state.genre);
+        renderHysteresis(initialData.hysteresis || {});
+
+        genreSelect.addEventListener("change", () => {
+          state.genre = genreSelect.value;
+          recommendGenre.value = state.genre;
+          applyTheme(state.genre);
+          state.scene = null;
+          populateScenes(state.genre);
+          renderSceneButtons(state.genre);
+          searchStatus.textContent = "Выберите сцену и запустите поиск.";
+        });
+
+        sceneSelect.addEventListener("change", () => {
+          state.scene = sceneSelect.value;
+          updateSceneButtonsHighlight();
+        });
+
+        searchButton.addEventListener("click", () => runSearch());
+        recommendButton.addEventListener("click", runRecommend);
+      }
+
+      initialise();
+    </script>
+  </body>
+</html>
