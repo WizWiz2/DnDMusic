@@ -14,14 +14,29 @@
 ## Запуск
 ```bash
 pip install -e .[dev]
-uvicorn app.api:app --reload
+
+# локальный запуск с автообновлением
+UVICORN_RELOAD=1 python -m app
 ```
 
 По умолчанию используется конфигурация `config/default.yaml`. Чтобы подключить другой файл, задайте переменную окружения `MUSIC_CONFIG_PATH`:
 
 ```bash
-MUSIC_CONFIG_PATH=./config/custom.yaml uvicorn app.api:app
+MUSIC_CONFIG_PATH=./config/custom.yaml python -m app
 ```
+
+### Деплой на Render (и похожих PaaS)
+
+Render передаёт порт через переменную окружения `PORT`. Скрипт `python -m app`
+поднимет uvicorn на `0.0.0.0:$PORT`, поэтому в настройках сервиса укажите
+команду запуска:
+
+```bash
+python -m app
+```
+
+При необходимости дополнительно задайте переменные окружения, например
+`MUSIC_CONFIG_PATH`.
 
 ## API
 ### Поиск сцены вручную
