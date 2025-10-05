@@ -1,7 +1,7 @@
 """Business logic for matching music scenes and genres."""
 from __future__ import annotations
 
-from typing import Iterable, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 from .cache import TTLCache
 from .models import (
@@ -70,6 +70,61 @@ class MusicService:
 
     def available_genres(self) -> Tuple[str, ...]:
         return tuple(sorted(self._config.genres.keys()))
+
+    def available_scenes(self, genre: str | None = None) -> Tuple[str, ...] | Dict[str, Tuple[str, ...]]:
+        """Return a tuple of scenes for a genre or a mapping for all genres.
+
+        When ``genre`` is provided the method validates that the genre exists and
+        returns the sorted tuple of scene identifiers for it.  Without the
+        argument a dictionary with scene tuples for every known genre is
+        returned.  The method is primarily used by the web UI to pre-populate
+        selector widgets without hitting the API for each option.
+        """
+
+        if genre is not None:
+            genre_key = genre.lower()
+            try:
+                scenes = self._config.genres[genre_key]
+            except KeyError as exc:
+                raise GenreNotFoundError(f"Unknown genre: {genre}") from exc
+            return tuple(sorted(scenes.keys()))
+
+        return {
+            genre_name: tuple(sorted(scenes.keys()))
+            for genre_name, scenes in self._config.genres.items()
+        }
+
+    def describe_scenes(self) -> Dict[str, List[Dict[str, Any]]]:
+        """Return structured scene metadata for each genre.
+
+        The description is a lightweight snapshot of configuration data.  It is
+        intentionally serialisable to JSON so the UI can embed it directly in
+        the rendered template.
+        """
+
+        library: Dict[str, List[Dict[str, Any]]] = {}
+        for genre, scenes in self._config.genres.items():
+            entries: List[Dict[str, Any]] = []
+            for scene_key, scene_config in scenes.items():
+                providers = [provider.model_dump() for provider in scene_config.providers]
+                entries.append(
+                    {
+                        "id": scene_key,
+                        "name": scene_key.replace("_", " ").title(),
+                        "query": scene_config.query,
+                        "volume": scene_config.volume,
+                        "crossfade": scene_config.crossfade,
+                        "cooldown_sec": scene_config.cooldown_sec,
+                        "providers": providers,
+                    }
+                )
+            library[genre] = sorted(entries, key=lambda item: item["name"])
+        return library
+
+    def hysteresis_settings(self) -> Dict[str, Any]:
+        """Return a JSON-serialisable view of hysteresis configuration."""
+
+        return self._config.hysteresis.model_dump()
 
     def recommend(self, genre: str, tags: Iterable[str]) -> RecommendationResult:
         if not tags:
