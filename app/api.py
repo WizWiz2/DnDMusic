@@ -4,7 +4,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from .config import load_config
@@ -48,32 +48,64 @@ def get_service() -> MusicService:
     return get_service_cached()
 
 
-@app.get("/", response_model=HealthStatus)
+@app.get("/health", response_model=HealthStatus)
 async def health(service: MusicService = Depends(get_service)) -> HealthStatus:
     return HealthStatus(genres=list(service.available_genres()))
+
+
+@app.head("/health")
+async def health_head(service: MusicService = Depends(get_service)) -> Response:
+    """Lightweight HEAD variant of the health endpoint for platform probes."""
+
+    # Touch the service so dependency validation matches the GET handler.
+    service.available_genres()
+    return Response(status_code=200)
+
+
+def _build_ui_context(service: MusicService) -> dict:
+    genres = list(service.available_genres())
+    scene_library = service.describe_scenes()
+    hysteresis = service.hysteresis_settings()
+
+    return {
+        "genres": genres,
+        "scenes": scene_library,
+        "hysteresis": hysteresis,
+    }
+
+
+def _render_ui(request: Request, context: dict) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "ui.html",
+        {
+            "initial_data": context,
+        },
+    )
+
+
+@app.get("/", response_class=HTMLResponse)
+async def root(
+    request: Request, service: MusicService = Depends(get_service)
+) -> HTMLResponse:
+    context = _build_ui_context(service)
+    return _render_ui(request, context)
+
+
+@app.head("/")
+async def root_head(service: MusicService = Depends(get_service)) -> Response:
+    """HEAD variant mirroring the HTML root endpoint for platform probes."""
+
+    service.available_genres()
+    return Response(status_code=200)
 
 
 @app.get("/ui", response_class=HTMLResponse)
 async def ui(
     request: Request, service: MusicService = Depends(get_service)
 ) -> HTMLResponse:
-    genres = list(service.available_genres())
-    scene_library = service.describe_scenes()
-    hysteresis = service.hysteresis_settings()
-
-    initial_data = {
-        "genres": genres,
-        "scenes": scene_library,
-        "hysteresis": hysteresis,
-    }
-
-    return templates.TemplateResponse(
-        request,
-        "ui.html",
-        {
-            "initial_data": initial_data,
-        },
-    )
+    context = _build_ui_context(service)
+    return _render_ui(request, context)
 
 
 @app.get("/api/search", response_model=SearchResult)

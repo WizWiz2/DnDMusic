@@ -16,7 +16,7 @@ def test_health_endpoint(monkeypatch) -> None:
     monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
     _reset_caches()
     client = TestClient(app)
-    response = client.get("/")
+    response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
@@ -84,4 +84,16 @@ def test_ui_page(monkeypatch) -> None:
     body = response.text
     assert "RPG Auto-DJ" in body
     # embedded JSON with genres should be present in the page
+    assert "initialData" in body
+
+
+def test_root_serves_ui(monkeypatch) -> None:
+    monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+    _reset_caches()
+    client = TestClient(app)
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "text/html" in response.headers.get("content-type", "")
+    body = response.text
+    assert "RPG Auto-DJ" in body
     assert "initialData" in body
