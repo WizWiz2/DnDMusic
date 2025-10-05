@@ -378,6 +378,22 @@
               </div>
               <div>
                 <div class="info-block">
+                  <h3>Плеер</h3>
+                  <div id="player" style="width:100%;aspect-ratio:16/9;background:rgba(0,0,0,0.06);border-radius:12px;overflow:hidden"></div>
+                  <div class="form-actions" style="margin-top:10px">
+                    <button id="player-play" type="button" class="secondary">▶️ Play</button>
+                    <button id="player-pause" type="button" class="secondary">⏸ Pause</button>
+                    <label style="margin-left:8px">Громкость <input id="player-volume" type="range" min="0" max="100" value="70" style="vertical-align:middle"/></label>
+                  </div>
+                  <div class="form-actions" style="margin-top:6px">
+                    <label>Провайдер
+                      <select id="provider-select" style="margin-left:8px"></select>
+                    </label>
+                    <button id="provider-open" type="button" class="secondary">🔗 Открыть</button>
+                  </div>
+                  <p class="status">Совет: нажмите Play один раз, чтобы разрешить автоплеи.</p>
+                </div>
+                <div class="info-block">
                   <h3>Поисковый запрос</h3>
                   <p id="result-query" class="status"></p>
                 </div>
@@ -410,6 +426,14 @@
             <button id="recommend-button" type="button">Рекомендовать сцену</button>
             <span class="status" id="recommend-status">Опишите ситуацию — система предложит сцену автоматически.</span>
           </div>
+          <div class="form-actions">
+            <button id="mic-toggle" type="button" class="secondary">🎙 Включить прослушивание</button>
+            <span class="status" id="mic-status">Распознавание речи выключено.</span>
+          </div>
+          <div class="form-actions">
+            <button id="whisper-toggle" type="button" class="secondary">🧠 Включить Whisper (эксперимент)</button>
+            <span class="status" id="whisper-status">Whisper выключен.</span>
+          </div>
         </div>
       </section>
     </main>
@@ -418,8 +442,9 @@
       Макет адаптируется под жанр: фэнтези — зелёные оттенки, киберпанк — неоновые, sci-fi — холодные, хоррор — тёмно-красные.
     </footer>
 
+    <script id="initial-data" type="application/json">{{ initial_data | tojson | safe }}</script>
     <script>
-      const initialData = {{ initial_data | tojson | safe }};
+      const initialData = JSON.parse(document.getElementById("initial-data").textContent);
 
       const THEMES = {
         fantasy: {
@@ -490,8 +515,17 @@
       const recommendTags = document.getElementById("recommend-tags");
       const recommendButton = document.getElementById("recommend-button");
       const recommendStatus = document.getElementById("recommend-status");
+      const micToggle = document.getElementById("mic-toggle");
+      const micStatus = document.getElementById("mic-status");
       const tagsRow = document.getElementById("result-tags");
       const reasonRow = document.getElementById("result-reason");
+      const playerPlayBtn = document.getElementById("player-play");
+      const playerPauseBtn = document.getElementById("player-pause");
+      const playerVolumeInput = document.getElementById("player-volume");
+      const providerSelect = document.getElementById("provider-select");
+      const providerOpenBtn = document.getElementById("provider-open");
+      const whisperToggle = document.getElementById("whisper-toggle");
+      const whisperStatus = document.getElementById("whisper-status");
 
       function formatLabel(value) {
         return value
@@ -660,6 +694,15 @@
           }
           playlistList.append(li);
         });
+
+        // Заполняем селектор провайдеров
+        providerSelect.innerHTML = "";
+        (playlists || []).forEach((p) => {
+          const opt = document.createElement("option");
+          opt.value = p.url;
+          opt.textContent = p.provider;
+          providerSelect.append(opt);
+        });
       }
 
       function showResult(result, meta, type) {
@@ -672,6 +715,10 @@
         renderSceneConfig(meta);
         renderPlaylists(result.playlists || []);
         renderHysteresis(result.hysteresis || {});
+        // Автовоспроизведение через YouTube search, если есть запрос
+        if (result.query) {
+          playSearchOnYouTube(result.query, meta);
+        }
 
         if (Array.isArray(result.tags)) {
           tagsRow.textContent = `Теги: ${result.tags.join(", ")}`;
@@ -694,6 +741,124 @@
         } else {
           resultConfidence.classList.add("hidden");
         }
+      }
+
+      // --- YouTube IFrame API ---
+      let ytPlayer = null;
+      let lastSetVolume = 70;
+      let isUserGestureUnlocked = false;
+      let isFading = false;
+
+      function ensureYouTubeApiLoaded(callback) {
+        if (window.YT && window.YT.Player) { callback(); return; }
+        const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+        if (!existing) {
+          const tag = document.createElement('script');
+          tag.src = "https://www.youtube.com/iframe_api";
+          document.head.appendChild(tag);
+        }
+        const wait = () => {
+          if (window.YT && window.YT.Player) callback(); else setTimeout(wait, 150);
+        };
+        wait();
+      }
+
+      function createOrGetPlayer() {
+        if (ytPlayer) return ytPlayer;
+        ytPlayer = new YT.Player('player', {
+          height: '390',
+          width: '640',
+          playerVars: {
+            autoplay: 0,
+            playsinline: 1,
+            rel: 0,
+          },
+          events: {
+            onReady: () => {
+              try { ytPlayer.setVolume(lastSetVolume); } catch {}
+            }
+          }
+        });
+        return ytPlayer;
+      }
+
+      function setVolumeSmooth(target, durationMs = 600) {
+        try {
+          const start = lastSetVolume;
+          const delta = target - start;
+          const t0 = performance.now();
+          const step = () => {
+            const t = Math.min(1, (performance.now() - t0) / durationMs);
+            const v = Math.round(start + delta * t);
+            ytPlayer.setVolume(v);
+            lastSetVolume = v;
+            if (t < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        } catch {}
+      }
+
+      function playSearchOnYouTube(query, meta) {
+        ensureYouTubeApiLoaded(() => {
+          const player = createOrGetPlayer();
+          const desiredVol = Number(meta?.volume ?? playerVolumeInput.value ?? 70);
+          const crossfadeSec = Number(meta?.crossfade ?? 3);
+
+          const doPlay = () => {
+            try {
+              // Играем поисковую выдачу по запросу как плейлист
+              player.loadPlaylist({ listType: 'search', list: query, index: 0 });
+              // Плавная установка громкости
+              setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
+            } catch (e) {
+              console.error(e);
+            }
+          };
+
+          // Если пользователь ещё не разблокировал автоплей — запросим кликом
+          if (!isUserGestureUnlocked) {
+            // Попытка тихого старта: mute -> play -> unmute по клику
+            try { player.mute(); } catch {}
+            doPlay();
+          } else {
+            // Мягкий кроссфейд: сначала приглушим текущий звук, затем загрузим новый список
+            if (!isFading) {
+              isFading = true;
+              setVolumeSmooth(0, Math.max(150, crossfadeSec * 500));
+              setTimeout(() => {
+                doPlay();
+                isFading = false;
+              }, Math.max(160, crossfadeSec * 520));
+            } else {
+              doPlay();
+            }
+          }
+        });
+      }
+
+      function bindPlayerControls() {
+        playerPlayBtn.addEventListener('click', () => {
+          ensureYouTubeApiLoaded(() => {
+            const p = createOrGetPlayer();
+            try { p.playVideo(); } catch {}
+            try { p.unMute(); } catch {}
+            isUserGestureUnlocked = true;
+          });
+        });
+        playerPauseBtn.addEventListener('click', () => {
+          if (!ytPlayer) return;
+          try { ytPlayer.pauseVideo(); } catch {}
+        });
+        playerVolumeInput.addEventListener('input', (e) => {
+          const v = Number(e.target.value || 0);
+          lastSetVolume = v;
+          if (!ytPlayer) return;
+          try { ytPlayer.setVolume(v); } catch {}
+        });
+        providerOpenBtn.addEventListener('click', () => {
+          const url = providerSelect.value;
+          if (url) window.open(url, '_blank', 'noopener');
+        });
       }
 
       async function runSearch(sceneOverride) {
@@ -778,6 +943,122 @@
         }
       }
 
+      async function runAutoRecommend(tags) {
+        const genre = state.genre;
+        if (!genre || !Array.isArray(tags) || !tags.length) {
+          return;
+        }
+        try {
+          const response = await fetch("/api/recommend", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ genre, tags }),
+          });
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.detail || "Рекомендация недоступна");
+          }
+          const result = await response.json();
+          state.genre = result.genre;
+          applyTheme(state.genre);
+          genreSelect.value = state.genre;
+          recommendGenre.value = state.genre;
+          populateScenes(state.genre);
+          sceneSelect.value = result.scene;
+          renderSceneButtons(state.genre);
+          updateSceneButtonsHighlight();
+          const meta = getSceneMeta(state.genre, result.scene);
+          showResult(result, meta, "recommend");
+          recommendStatus.textContent = "Готово! Сцена подобрана автоматически.";
+        } catch (error) {
+          console.error(error);
+          recommendStatus.textContent = error.message;
+        }
+      }
+
+      // --- Автопрослушивание (Web Speech API) ---
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition = null;
+      let listening = false;
+      let lastAutoAt = 0;
+
+      function extractTags(text) {
+        const t = String(text || "").toLowerCase();
+        const tags = new Set();
+        // Простейшие словари по ключевым словам
+        if (/(\bбой|\bбитв|\bсхватк|battle|attack|fight)/.test(t)) tags.add("battle");
+        if (/(таверн|бар|inn|tavern)/.test(t)) tags.add("tavern");
+        if (/(исслед|поиск|путь|дорог|explor|travel|journey|forest|ruins)/.test(t)) tags.add("exploration");
+        if (/(напряж|страх|жутк|опасн|trap|tension|suspense)/.test(t)) tags.add("tension");
+        if (/(погон|преслед|chase|pursuit)/.test(t)) tags.add("chase");
+        if (/(ритуал|обряд|ritual)/.test(t)) tags.add("ritual");
+        if (/(отдых|camp|rest)/.test(t)) tags.add("rest");
+        if (/(дракон|dragon|драконы)/.test(t)) tags.add("dragons");
+        return Array.from(tags);
+      }
+
+      function canFireAuto(nowMs) {
+        const windowSec = Number(initialData.hysteresis?.window_sec ?? 30);
+        const cooldownSec = Number(initialData.hysteresis?.cooldown_sec ?? 60);
+        // Простая модель: не чаще, чем раз в (window+cooldown)
+        const minGapMs = (windowSec + cooldownSec) * 1000;
+        return nowMs - lastAutoAt >= minGapMs;
+      }
+
+      function startListening() {
+        if (!SpeechRecognition) {
+          micStatus.textContent = "Распознавание недоступно в этом браузере.";
+          return;
+        }
+        if (listening) return;
+        recognition = new SpeechRecognition();
+        recognition.lang = "ru-RU";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = () => {
+          listening = true;
+          micToggle.textContent = "⏸ Остановить прослушивание";
+          micStatus.textContent = "Идёт прослушивание… говорите фразы естественно.";
+        };
+        recognition.onerror = (e) => {
+          console.error(e);
+          micStatus.textContent = "Ошибка распознавания речи.";
+        };
+        recognition.onend = () => {
+          listening = false;
+          micToggle.textContent = "🎙 Включить прослушивание";
+          micStatus.textContent = "Распознавание речи выключено.";
+        };
+        recognition.onresult = (event) => {
+          let finalText = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const res = event.results[i];
+            if (res.isFinal) finalText += res[0].transcript + " ";
+          }
+          if (finalText.trim()) {
+            const now = Date.now();
+            const tags = extractTags(finalText);
+            if (tags.length) {
+              micStatus.textContent = `Распознано: ${finalText.trim()} → теги: ${tags.join(", ")}`;
+              if (canFireAuto(now)) {
+                lastAutoAt = now;
+                runAutoRecommend(tags);
+              }
+            } else {
+              micStatus.textContent = `Распознано: ${finalText.trim()}`;
+            }
+          }
+        };
+        try { recognition.start(); } catch {}
+      }
+
+      function stopListening() {
+        if (recognition && listening) {
+          try { recognition.stop(); } catch {}
+        }
+      }
+
       function initialise() {
         if (!initialData.genres.length) {
           searchStatus.textContent = "Не удалось загрузить жанры. Проверьте конфигурацию.";
@@ -818,6 +1099,45 @@
 
         searchButton.addEventListener("click", () => runSearch());
         recommendButton.addEventListener("click", runRecommend);
+        micToggle.addEventListener("click", () => {
+          if (listening) stopListening(); else startListening();
+        });
+        bindPlayerControls();
+
+        // Toggle Whisper (эксперимент — только загрузка модели и статус)
+        whisperToggle.addEventListener('click', async () => {
+          if (window.__whisperLoading || window.__whisperReady) {
+            window.__whisperEnabled = !window.__whisperEnabled;
+            whisperStatus.textContent = window.__whisperEnabled ? 'Whisper включен (эксперимент)' : 'Whisper выключен.';
+            return;
+          }
+          try {
+            window.__whisperLoading = true;
+            whisperStatus.textContent = 'Загружаем Whisper-модель…';
+            // Ленивая подгрузка скрипта-модуля, который может инициализировать пайплайн позднее
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.textContent = `
+              import 'https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js';
+              window.__whisperReady = true;
+            `;
+            document.head.appendChild(script);
+            const waitReady = () => {
+              if (window.__whisperReady) {
+                window.__whisperEnabled = true;
+                whisperStatus.textContent = 'Whisper включен (эксперимент). Для реального распознавания пока используется Web Speech API.';
+              } else {
+                setTimeout(waitReady, 200);
+              }
+            };
+            waitReady();
+          } catch (e) {
+            console.error(e);
+            whisperStatus.textContent = 'Не удалось загрузить Whisper. Продолжаем через Web Speech API.';
+          } finally {
+            window.__whisperLoading = false;
+          }
+        });
       }
 
       initialise();
