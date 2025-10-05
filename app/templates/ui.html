@@ -748,6 +748,8 @@
       let lastSetVolume = 70;
       let isUserGestureUnlocked = false;
       let isFading = false;
+      let lastQuery = null;
+      let lastMeta = null;
 
       function ensureYouTubeApiLoaded(callback) {
         if (window.YT && window.YT.Player) { callback(); return; }
@@ -772,11 +774,25 @@
             autoplay: 0,
             playsinline: 1,
             rel: 0,
+            enablejsapi: 1,
+            origin: location.origin,
           },
           events: {
             onReady: () => {
               try { ytPlayer.setVolume(lastSetVolume); } catch {}
-            }
+            },
+            onStateChange: (e) => {
+              // If video is cued but not playing, try to start playback per policy
+              const YTState = window.YT?.PlayerState;
+              if (!YTState) return;
+              if (e.data === YTState.CUED) {
+                try {
+                  if (isUserGestureUnlocked) {
+                    ytPlayer.playVideo();
+                  }
+                } catch {}
+              }
+            },
           }
         });
         return ytPlayer;
@@ -803,11 +819,15 @@
           const player = createOrGetPlayer();
           const desiredVol = Number(meta?.volume ?? playerVolumeInput.value ?? 70);
           const crossfadeSec = Number(meta?.crossfade ?? 3);
+          lastQuery = String(query || '');
+          lastMeta = meta || null;
 
           const doPlay = () => {
             try {
               // Играем поисковую выдачу по запросу как плейлист
               player.loadPlaylist({ listType: 'search', list: query, index: 0 });
+              // В некоторых браузерах нужно явное playVideo после loadPlaylist
+              setTimeout(() => { try { if (isUserGestureUnlocked) player.playVideo(); } catch {} }, 200);
               // Плавная установка громкости
               setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
             } catch (e) {
@@ -843,6 +863,10 @@
             try { p.playVideo(); } catch {}
             try { p.unMute(); } catch {}
             isUserGestureUnlocked = true;
+            // Если есть незапущенный последний запрос — перезапустим его после разблокировки
+            if (lastQuery) {
+              try { playSearchOnYouTube(lastQuery, lastMeta); } catch {}
+            }
           });
         });
         playerPauseBtn.addEventListener('click', () => {
