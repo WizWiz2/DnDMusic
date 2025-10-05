@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import json
+from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, Response
-from fastapi.templating import Jinja2Templates
 
 from .config import load_config
 from .models import (
@@ -26,7 +28,46 @@ from .ai_client import NeuralTaggerClient
 
 app = FastAPI(title="DnD Music Tool", version="0.1.0")
 
-templates = Jinja2Templates(directory="app/templates")
+_UI_TEMPLATE_PLACEHOLDER = "{{ initial_data | tojson | safe }}"
+
+
+@lru_cache(maxsize=1)
+def _load_ui_template() -> str:
+    template_path = Path(__file__).with_name("templates") / "ui.html"
+    return template_path.read_text(encoding="utf-8")
+
+
+def _encode_initial_payload(initial_data: dict) -> str:
+    """Serialize the initial payload exactly as the UI expects.
+
+    The result mirrors Jinja's ``tojson`` filter behaviour so the embedded
+    object can be consumed safely by inline JavaScript without risking that the
+    ``</script>`` sequence or other HTML-sensitive characters break the page.
+    """
+
+    encoded = json.dumps(
+        jsonable_encoder(initial_data), ensure_ascii=False, separators=(",", ":")
+    )
+    # Воспроизводим экранирование Jinja ``tojson`` для безопасного встраивания.
+    replacements = (
+        ("&", "\\u0026"),
+        ("<", "\\u003c"),
+        (">", "\\u003e"),
+        ("'", "\\u0027"),
+    )
+    for original, escaped in replacements:
+        encoded = encoded.replace(original, escaped)
+    # Эти специальные разделители ломают некоторые JS-движки в inline-скриптах.
+    encoded = encoded.replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+    return encoded
+
+
+def _render_ui(initial_data: dict) -> str:
+    template = _load_ui_template()
+    initial_json = _encode_initial_payload(initial_data)
+    if _UI_TEMPLATE_PLACEHOLDER not in template:
+        raise RuntimeError("UI template placeholder not found")
+    return template.replace(_UI_TEMPLATE_PLACEHOLDER, initial_json, 1)
 
 
 @lru_cache(maxsize=1)
@@ -48,41 +89,47 @@ def get_service() -> MusicService:
     return get_service_cached()
 
 
-@app.get("/", response_model=HealthStatus)
+def _build_ui_initial_data(service: MusicService) -> dict:
+    genres = list(service.available_genres())
+    scene_library = service.describe_scenes()
+    hysteresis = service.hysteresis_settings()
+
+    return {
+        "genres": genres,
+        "scenes": scene_library,
+        "hysteresis": hysteresis,
+    }
+
+
+def _render_ui_response(initial_data: dict) -> HTMLResponse:
+    rendered = _render_ui(initial_data)
+    return HTMLResponse(content=rendered)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def ui_root(service: MusicService = Depends(get_service)) -> HTMLResponse:
+    initial_data = _build_ui_initial_data(service)
+    return _render_ui_response(initial_data)
+
+
+@app.get("/ui", response_class=HTMLResponse)
+async def ui(service: MusicService = Depends(get_service)) -> HTMLResponse:
+    initial_data = _build_ui_initial_data(service)
+    return _render_ui_response(initial_data)
+
+
+@app.get("/health", response_model=HealthStatus)
 async def health(service: MusicService = Depends(get_service)) -> HealthStatus:
     return HealthStatus(genres=list(service.available_genres()))
 
 
-@app.head("/")
+@app.head("/health")
 async def health_head(service: MusicService = Depends(get_service)) -> Response:
     """Lightweight HEAD variant of the health endpoint for platform probes."""
 
     # Touch the service so dependency validation matches the GET handler.
     service.available_genres()
     return Response(status_code=200)
-
-
-@app.get("/ui", response_class=HTMLResponse)
-async def ui(
-    request: Request, service: MusicService = Depends(get_service)
-) -> HTMLResponse:
-    genres = list(service.available_genres())
-    scene_library = service.describe_scenes()
-    hysteresis = service.hysteresis_settings()
-
-    initial_data = {
-        "genres": genres,
-        "scenes": scene_library,
-        "hysteresis": hysteresis,
-    }
-
-    return templates.TemplateResponse(
-        request,
-        "ui.html",
-        {
-            "initial_data": initial_data,
-        },
-    )
 
 
 @app.get("/api/search", response_model=SearchResult)
