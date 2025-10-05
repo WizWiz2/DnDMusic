@@ -44,9 +44,11 @@ class NeuralTaggerClient:
 
     def recommend_scene(self, genre: str, tags: Iterable[str]) -> ScenePrediction:
         normalized_tags = [str(tag) for tag in tags if str(tag).strip()]
-        payload: dict[str, object] = {"genre": genre, "tags": normalized_tags}
+        inputs_payload: dict[str, object] = {"genre": genre, "tags": normalized_tags}
         if normalized_tags:
-            payload["tags_text"] = ", ".join(normalized_tags)
+            inputs_payload["tags_text"] = ", ".join(normalized_tags)
+
+        payload: dict[str, object] = {"inputs": inputs_payload}
         headers = {"Content-Type": "application/json"}
         if self._token:
             headers["Authorization"] = f"Bearer {self._token}"

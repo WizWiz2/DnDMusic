@@ -10,9 +10,10 @@ def test_neural_client_success() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         payload = json.loads(request.content.decode())
-        assert payload["genre"] == "fantasy"
-        assert payload["tags"] == ["battle"]
-        assert payload["tags_text"] == "battle"
+        inputs = payload["inputs"]
+        assert inputs["genre"] == "fantasy"
+        assert inputs["tags"] == ["battle"]
+        assert inputs["tags_text"] == "battle"
         return httpx.Response(200, json={"scene": "battle", "confidence": 0.88, "reason": "stub"})
 
     client = NeuralTaggerClient(endpoint="http://test", transport=httpx.MockTransport(handler))
@@ -34,7 +35,7 @@ def test_neural_client_error_status() -> None:
 def test_neural_client_nested_scene() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content.decode())
-        assert payload["tags_text"] == "battle, dragons"
+        assert payload["inputs"]["tags_text"] == "battle, dragons"
         return httpx.Response(
             200,
             json={
