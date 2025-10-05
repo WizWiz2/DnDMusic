@@ -4,7 +4,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from .config import load_config
@@ -51,6 +51,15 @@ def get_service() -> MusicService:
 @app.get("/", response_model=HealthStatus)
 async def health(service: MusicService = Depends(get_service)) -> HealthStatus:
     return HealthStatus(genres=list(service.available_genres()))
+
+
+@app.head("/")
+async def health_head(service: MusicService = Depends(get_service)) -> Response:
+    """Lightweight HEAD variant of the health endpoint for platform probes."""
+
+    # Touch the service so dependency validation matches the GET handler.
+    service.available_genres()
+    return Response(status_code=200)
 
 
 @app.get("/ui", response_class=HTMLResponse)
