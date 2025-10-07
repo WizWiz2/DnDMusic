@@ -903,6 +903,40 @@
         });
       }
 
+      async function extractErrorMessage(response, fallbackMessage, context) {
+        if (!response) {
+          return fallbackMessage;
+        }
+
+        try {
+          const payload = await response.clone().json();
+          if (payload && typeof payload === "object") {
+            const detail = payload.detail || payload.message || payload.error;
+            if (detail) {
+              return String(detail);
+            }
+          }
+        } catch (error) {
+          console.debug("Не удалось распарсить JSON ошибки", error);
+        }
+
+        if (context === "recommend" && response.status === 503) {
+          return "Автоподбор сцен временно недоступен. Проверьте настройки сервиса рекомендаций.";
+        }
+
+        try {
+          const text = await response.text();
+          const trimmed = text.trim();
+          if (trimmed && !/^</.test(trimmed)) {
+            return trimmed.length > 240 ? `${trimmed.slice(0, 237)}…` : trimmed;
+          }
+        } catch (error) {
+          console.debug("Не удалось прочитать текст ошибки", error);
+        }
+
+        return fallbackMessage;
+      }
+
       async function runSearch(sceneOverride) {
         if (!state.genre) {
           searchStatus.textContent = "Сначала выберите жанр.";
@@ -920,8 +954,12 @@
           const params = new URLSearchParams({ genre: state.genre, scene });
           const response = await fetch(`/api/search?${params.toString()}`);
           if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.detail || "Не удалось получить плейлисты");
+            const message = await extractErrorMessage(
+              response,
+              "Не удалось получить плейлисты",
+              "search",
+            );
+            throw new Error(message);
           }
           const result = await response.json();
           state.scene = result.scene;
@@ -962,8 +1000,12 @@
             body: JSON.stringify({ genre, tags }),
           });
           if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.detail || "Рекомендация недоступна");
+            const message = await extractErrorMessage(
+              response,
+              "Рекомендация недоступна",
+              "recommend",
+            );
+            throw new Error(message);
           }
           const result = await response.json();
           state.genre = result.genre;
@@ -997,8 +1039,12 @@
             body: JSON.stringify({ genre, tags }),
           });
           if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload.detail || "Рекомендация недоступна");
+            const message = await extractErrorMessage(
+              response,
+              "Рекомендация недоступна",
+              "recommend",
+            );
+            throw new Error(message);
           }
           const result = await response.json();
           state.genre = result.genre;
