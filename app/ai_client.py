@@ -54,15 +54,19 @@ class NeuralTaggerClient:
         genre_text = str(genre).strip()
         tags_text = ", ".join(normalized_tags)
         prompt = self._build_prompt(genre_text, normalized_tags)
-        inputs_payload: dict[str, object] = {
-            "genre": genre,
-            "tags": normalized_tags,
-            "prompt": prompt,
-        }
+        inputs_payload: dict[str, object] = {"prompt": prompt}
+
+        parameters: dict[str, object] = {}
+        if genre_text:
+            parameters["genre"] = genre_text
+        if normalized_tags:
+            parameters["tags"] = normalized_tags
         if tags_text:
-            inputs_payload["tags_text"] = tags_text
+            parameters["tags_text"] = tags_text
 
         payload: dict[str, object] = {"inputs": inputs_payload}
+        if parameters:
+            payload["parameters"] = parameters
         headers = {"Content-Type": "application/json"}
         if self._token:
             headers["Authorization"] = f"Bearer {self._token}"
