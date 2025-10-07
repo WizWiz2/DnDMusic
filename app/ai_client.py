@@ -9,8 +9,10 @@ import httpx
 
 
 DEFAULT_ENDPOINT = "http://localhost:8081/api/v1/recommend"
+DEFAULT_TIMEOUT = 30.0
 ENV_ENDPOINT = "MUSIC_AI_ENDPOINT"
 ENV_TOKEN = "MUSIC_AI_TOKEN"
+ENV_TIMEOUT = "MUSIC_AI_TIMEOUT"
 
 
 class NeuralTaggerError(RuntimeError):
@@ -33,12 +35,13 @@ class NeuralTaggerClient:
         self,
         endpoint: str | None = None,
         *,
-        timeout: float = 5.0,
+        timeout: float | None = None,
         token: str | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        self._endpoint = endpoint or os.getenv(ENV_ENDPOINT, DEFAULT_ENDPOINT)
-        self._timeout = timeout
+        raw_endpoint = endpoint or os.getenv(ENV_ENDPOINT, DEFAULT_ENDPOINT)
+        self._endpoint = str(raw_endpoint).strip()
+        self._timeout = self._resolve_timeout(timeout)
         self._token = token or os.getenv(ENV_TOKEN)
         self._transport = transport
 
@@ -136,3 +139,18 @@ class NeuralTaggerClient:
         if prompt_parts:
             return ". ".join(prompt_parts)
         return "Музыкальная сцена"
+
+    def _resolve_timeout(self, timeout: float | None) -> float:
+        if timeout is not None:
+            return float(timeout)
+
+        env_timeout = os.getenv(ENV_TIMEOUT)
+        if env_timeout:
+            try:
+                return float(env_timeout)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Неверное значение таймаута '{env_timeout}' в переменной {ENV_TIMEOUT}"
+                ) from exc
+
+        return DEFAULT_TIMEOUT

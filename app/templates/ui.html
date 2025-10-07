@@ -547,12 +547,25 @@
 
       function populateGenres(select) {
         select.innerHTML = "";
-        initialData.genres.forEach((genre) => {
+        let matched = false;
+        initialData.genres.forEach((genre, index) => {
           const option = document.createElement("option");
           option.value = genre;
           option.textContent = formatLabel(genre);
+          if (!state.genre && index === 0) {
+            state.genre = genre;
+          }
+          if (genre === state.genre) {
+            option.selected = true;
+            matched = true;
+          }
           select.append(option);
         });
+
+        if (!matched && initialData.genres.length) {
+          select.selectedIndex = 0;
+          state.genre = select.value;
+        }
       }
 
       function getSceneMeta(genre, scene) {
@@ -563,30 +576,35 @@
       function populateScenes(genre) {
         const scenes = initialData.scenes[genre] || [];
         sceneSelect.innerHTML = "";
+
+        if (!scenes.length) {
+          state.scene = null;
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "Нет сцен";
+          option.selected = true;
+          sceneSelect.append(option);
+          return;
+        }
+
+        let matched = false;
         scenes.forEach((scene, index) => {
           const option = document.createElement("option");
           option.value = scene.id;
           option.textContent = scene.name;
-          if (index === 0 && !state.scene) {
-            option.selected = true;
+          if (!state.scene && index === 0) {
             state.scene = scene.id;
+          }
+          if (scene.id === state.scene) {
+            option.selected = true;
+            matched = true;
           }
           sceneSelect.append(option);
         });
 
-        if (scenes.length > 0 && !state.scene) {
+        if (!matched && scenes.length) {
           state.scene = scenes[0].id;
-        }
-
-        if (state.scene) {
           sceneSelect.value = state.scene;
-        }
-
-        if (!scenes.length) {
-          const option = document.createElement("option");
-          option.value = "";
-          option.textContent = "Нет сцен";
-          sceneSelect.append(option);
         }
       }
 
