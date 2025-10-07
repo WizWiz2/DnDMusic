@@ -54,6 +54,31 @@ class SceneConfig(BaseModel):
     )
 
 
+class DynamicSceneConfig(BaseModel):
+    """Настройки по умолчанию для динамических сцен внутри жанра."""
+
+    volume: Optional[int] = Field(None, ge=0, le=100, description="Рекомендуемая громкость")
+    crossfade: Optional[int] = Field(None, ge=0, le=30, description="Время кроссфейда в секундах")
+    cooldown_sec: Optional[int] = Field(
+        None, ge=0, description="Рекомендуемое значение антидребезга"
+    )
+    providers: List[PlaylistProviderConfig] = Field(
+        default_factory=list, description="Список провайдеров плейлистов"
+    )
+
+
+class GenreConfig(BaseModel):
+    """Конфигурация жанра, включающая сцены и fallback для динамических запросов."""
+
+    scenes: Dict[str, SceneConfig] = Field(
+        default_factory=dict, description="Явно описанные сцены жанра"
+    )
+    dynamic_defaults: Optional[DynamicSceneConfig] = Field(
+        None,
+        description="Настройки по умолчанию для сцен, отсутствующих в явной конфигурации",
+    )
+
+
 class HysteresisConfig(BaseModel):
     """Параметры антидребезга, возвращаемые фронтенду."""
 
@@ -66,18 +91,25 @@ class HysteresisConfig(BaseModel):
 class MusicConfig(BaseModel):
     """Вся конфигурация проекта."""
 
-    genres: Dict[str, Dict[str, SceneConfig]]
+    genres: Dict[str, GenreConfig]
     hysteresis: HysteresisConfig
 
     def get_scene(self, genre: str, scene: str) -> SceneConfig:
-        genre_key = genre.lower()
+        genre_config = self._get_genre_config(genre)
         scene_key = scene.lower()
+        if scene_key not in genre_config.scenes:
+            raise KeyError(f"Unknown scene '{scene}' for genre '{genre}'")
+        return genre_config.scenes[scene_key]
+
+    def get_dynamic_defaults(self, genre: str) -> Optional[DynamicSceneConfig]:
+        genre_config = self._get_genre_config(genre)
+        return genre_config.dynamic_defaults
+
+    def _get_genre_config(self, genre: str) -> GenreConfig:
+        genre_key = genre.lower()
         if genre_key not in self.genres:
             raise KeyError(f"Unknown genre: {genre}")
-        scenes = self.genres[genre_key]
-        if scene_key not in scenes:
-            raise KeyError(f"Unknown scene '{scene}' for genre '{genre}'")
-        return scenes[scene_key]
+        return self.genres[genre_key]
 
 
 class SearchResult(BaseModel):

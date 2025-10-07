@@ -85,14 +85,14 @@ class MusicService:
         if genre is not None:
             genre_key = genre.lower()
             try:
-                scenes = self._config.genres[genre_key]
+                genre_config = self._config.genres[genre_key]
             except KeyError as exc:
                 raise GenreNotFoundError(f"Unknown genre: {genre}") from exc
-            return tuple(sorted(scenes.keys()))
+            return tuple(sorted(genre_config.scenes.keys()))
 
         return {
-            genre_name: tuple(sorted(scenes.keys()))
-            for genre_name, scenes in self._config.genres.items()
+            genre_name: tuple(sorted(genre.scenes.keys()))
+            for genre_name, genre in self._config.genres.items()
         }
 
     def describe_scenes(self) -> Dict[str, List[Dict[str, Any]]]:
@@ -104,9 +104,9 @@ class MusicService:
         """
 
         library: Dict[str, List[Dict[str, Any]]] = {}
-        for genre, scenes in self._config.genres.items():
+        for genre, genre_config in self._config.genres.items():
             entries: List[Dict[str, Any]] = []
-            for scene_key, scene_config in scenes.items():
+            for scene_key, scene_config in genre_config.scenes.items():
                 providers = [provider.model_dump() for provider in scene_config.providers]
                 entries.append(
                     {
@@ -128,49 +128,79 @@ class MusicService:
         return self._config.hysteresis.model_dump()
 
     def recommend(self, genre: str, tags: Iterable[str]) -> RecommendationResult:
-        if not tags:
-            raise RecommendationUnavailableError("Нужен хотя бы один тег для рекомендации")
+        normalized_tags = list(tags)
+        if not normalized_tags:
+            raise RecommendationUnavailableError(
+                "Нужен хотя бы один тег для рекомендации"
+            )
         if not self._ai_client:
             raise RecommendationUnavailableError("Сервис рекомендаций не настроен")
 
-        prediction = self._call_ai(genre, tags)
-        base_result = self.search(genre, prediction.scene)
+        prediction, canonical_scene = self._call_ai(genre, normalized_tags)
+
+        if canonical_scene:
+            base_result = self.search(genre, canonical_scene)
+            scene_slug = base_result.scene
+            query = base_result.query
+            playlists = base_result.playlists
+        else:
+            fallback = self._config.get_dynamic_defaults(genre)
+            if fallback is None:
+                raise RecommendationUnavailableError(
+                    "Нейросеть вернула неизвестную сцену, а fallback не настроен"
+                )
+            scene_slug = self._normalize_token(prediction.scene)
+            if not scene_slug:
+                raise RecommendationUnavailableError(
+                    "Не удалось интерпретировать сцену из рекомендаций"
+                )
+            playlists = [
+                provider.build_search(prediction.scene)
+                for provider in fallback.providers
+            ]
+            base_result = SearchResult(
+                genre=genre.lower(),
+                scene=scene_slug,
+                query=prediction.scene,
+                playlists=playlists,
+                hysteresis=self._config.hysteresis,
+            )
+            query = prediction.scene
+
         return RecommendationResult(
             genre=base_result.genre,
-            scene=base_result.scene,
-            query=base_result.query,
-            playlists=base_result.playlists,
+            scene=scene_slug,
+            query=query,
+            playlists=playlists,
             hysteresis=base_result.hysteresis,
-            tags=list(tags),
+            tags=normalized_tags,
             confidence=prediction.confidence,
             reason=prediction.reason,
         )
 
-    def _call_ai(self, genre: str, tags: Iterable[str]) -> ScenePrediction:
+    def _call_ai(
+        self, genre: str, tags: Iterable[str]
+    ) -> Tuple[ScenePrediction, str | None]:
         try:
             prediction = self._ai_client.recommend_scene(genre, tags)  # type: ignore[union-attr]
         except NeuralTaggerError as exc:
             raise RecommendationUnavailableError(str(exc)) from exc
 
         canonical_scene = self._canonical_scene_slug(genre, prediction.scene)
-        return ScenePrediction(
-            scene=canonical_scene,
-            confidence=prediction.confidence,
-            reason=prediction.reason,
-        )
+        return prediction, canonical_scene
 
-    def _canonical_scene_slug(self, genre: str, scene_name: str) -> str:
+    def _canonical_scene_slug(self, genre: str, scene_name: str) -> str | None:
         genre_key = genre.lower()
         try:
-            scenes = self._config.genres[genre_key]
+            genre_config = self._config.genres[genre_key]
         except KeyError as exc:
             raise GenreNotFoundError(f"Unknown genre: {genre}") from exc
 
         normalized_scene = self._normalize_token(scene_name)
         if not normalized_scene:
-            raise RecommendationUnavailableError(
-                "Не удалось интерпретировать сцену из рекомендаций"
-            )
+            return None
+
+        scenes = genre_config.scenes
 
         for scene_id in scenes.keys():
             if self._normalize_token(scene_id) == normalized_scene:
@@ -190,9 +220,7 @@ class MusicService:
             if normalized_id and normalized_id in prediction_tokens:
                 return scene_id
 
-        raise RecommendationUnavailableError(
-            f"Нейросеть вернула неизвестную сцену '{scene_name}'"
-        )
+        return None
 
     @staticmethod
     def _normalize_token(value: str) -> str:
