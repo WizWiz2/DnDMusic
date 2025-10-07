@@ -43,10 +43,21 @@ class NeuralTaggerClient:
         self._transport = transport
 
     def recommend_scene(self, genre: str, tags: Iterable[str]) -> ScenePrediction:
-        normalized_tags = [str(tag) for tag in tags if str(tag).strip()]
-        inputs_payload: dict[str, object] = {"genre": genre, "tags": normalized_tags}
-        if normalized_tags:
-            inputs_payload["tags_text"] = ", ".join(normalized_tags)
+        normalized_tags: list[str] = []
+        for tag in tags:
+            tag_text = str(tag).strip()
+            if tag_text:
+                normalized_tags.append(tag_text)
+        genre_text = str(genre).strip()
+        tags_text = ", ".join(normalized_tags)
+        prompt = self._build_prompt(genre_text, normalized_tags)
+        inputs_payload: dict[str, object] = {
+            "genre": genre,
+            "tags": normalized_tags,
+            "prompt": prompt,
+        }
+        if tags_text:
+            inputs_payload["tags_text"] = tags_text
 
         payload: dict[str, object] = {"inputs": inputs_payload}
         headers = {"Content-Type": "application/json"}
@@ -106,3 +117,16 @@ class NeuralTaggerClient:
             except (TypeError, ValueError) as exc:  # pragma: no cover - защитный код
                 raise NeuralTaggerError("Неверное значение confidence в ответе сервиса") from exc
         return ScenePrediction(scene=str(raw_scene).lower(), confidence=confidence, reason=reason)
+
+    @staticmethod
+    def _build_prompt(genre: str, tags: list[str]) -> str:
+        """Собирает осмысленную текстовую подсказку для сервиса."""
+
+        prompt_parts: list[str] = []
+        if genre:
+            prompt_parts.append(f"Жанр: {genre}")
+        if tags:
+            prompt_parts.append(f"Теги: {', '.join(tags)}")
+        if prompt_parts:
+            return ". ".join(prompt_parts)
+        return "Музыкальная сцена"
