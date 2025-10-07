@@ -52,9 +52,9 @@ def test_recommend_endpoint(monkeypatch) -> None:
 
     class StubAI:
         def recommend_scene(self, genre: str, tags):
-            assert genre == "fantasy"
+            assert genre == "pirate"
             assert tags == ["battle", "dragons"]
-            return ScenePrediction(scene="battle", confidence=0.91, reason="stub")
+            return ScenePrediction(scene="tavern brawl", confidence=0.91, reason="stub")
 
     service = MusicService(load_config(), ai_client=StubAI())
 
@@ -63,16 +63,34 @@ def test_recommend_endpoint(monkeypatch) -> None:
 
     response = client.post(
         "/api/recommend",
-        json={"genre": "fantasy", "tags": ["battle", "dragons"]},
+        json={"genre": "pirate", "tags": ["battle", "dragons"]},
     )
 
     try:
         assert response.status_code == 200
         payload = response.json()
-        assert payload["scene"] == "battle"
+        assert payload["scene"] == "tavern_brawl"
         assert payload["confidence"] == 0.91
         assert payload["tags"] == ["battle", "dragons"]
         assert payload["reason"] == "stub"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_recommend_endpoint_without_ai(monkeypatch) -> None:
+    monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+    _reset_caches()
+
+    client = TestClient(app)
+
+    app.dependency_overrides[get_service] = lambda: MusicService(load_config())
+
+    try:
+        response = client.post(
+            "/api/recommend",
+            json={"genre": "fantasy", "tags": ["battle"]},
+        )
+        assert response.status_code == 503
     finally:
         app.dependency_overrides.clear()
 

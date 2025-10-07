@@ -64,6 +64,22 @@ def test_recommend_uses_ai(service_with_ai: MusicService) -> None:
     assert result.tags == ["battle", "dragons"]
 
 
+def test_recommend_normalizes_scene_slug(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+
+    class StubAI:
+        def recommend_scene(self, genre: str, tags):
+            assert genre == "pirate"
+            assert tags
+            return ScenePrediction(scene="tavern brawl", confidence=0.5, reason="stub")
+
+    service = MusicService(load_config(), ai_client=StubAI())
+
+    result = service.recommend("pirate", ["fight"])
+    assert result.scene == "tavern_brawl"
+    assert result.confidence == 0.5
+
+
 def test_recommend_without_ai(service: MusicService) -> None:
     with pytest.raises(RecommendationUnavailableError):
         service.recommend("fantasy", ["battle"])

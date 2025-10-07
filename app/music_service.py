@@ -1,6 +1,7 @@
 """Business logic for matching music scenes and genres."""
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Iterable, List, Tuple
 
 from .cache import TTLCache
@@ -151,11 +152,49 @@ class MusicService:
         except NeuralTaggerError as exc:
             raise RecommendationUnavailableError(str(exc)) from exc
 
-        # проверяем, что выбранная сцена действительно существует
+        canonical_scene = self._canonical_scene_slug(genre, prediction.scene)
+        return ScenePrediction(
+            scene=canonical_scene,
+            confidence=prediction.confidence,
+            reason=prediction.reason,
+        )
+
+    def _canonical_scene_slug(self, genre: str, scene_name: str) -> str:
+        genre_key = genre.lower()
         try:
-            self._get_scene_config(genre, prediction.scene)
-        except SceneNotFoundError as exc:
+            scenes = self._config.genres[genre_key]
+        except KeyError as exc:
+            raise GenreNotFoundError(f"Unknown genre: {genre}") from exc
+
+        normalized_scene = self._normalize_token(scene_name)
+        if not normalized_scene:
             raise RecommendationUnavailableError(
-                f"Нейросеть вернула неизвестную сцену '{prediction.scene}'"
-            ) from exc
-        return prediction
+                "Не удалось интерпретировать сцену из рекомендаций"
+            )
+
+        for scene_id in scenes.keys():
+            if self._normalize_token(scene_id) == normalized_scene:
+                return scene_id
+
+        prediction_tokens = [
+            token
+            for token in (
+                self._normalize_token(raw)
+                for raw in re.split(r"[^a-z0-9]+", scene_name.lower())
+            )
+            if token
+        ]
+
+        for scene_id in scenes.keys():
+            normalized_id = self._normalize_token(scene_id)
+            if normalized_id and normalized_id in prediction_tokens:
+                return scene_id
+
+        raise RecommendationUnavailableError(
+            f"Нейросеть вернула неизвестную сцену '{scene_name}'"
+        )
+
+    @staticmethod
+    def _normalize_token(value: str) -> str:
+        tokens = [part for part in re.split(r"[^a-z0-9]+", value.lower()) if part]
+        return "_".join(tokens)
