@@ -1,279 +1,362 @@
 genres:
   fantasy:
-    battle:
-      query: "epic fantasy battle instrumental -vocals"
-      volume: 85
-      crossfade: 3
-      cooldown_sec: 75
-      providers:
-        - name: youtube_music
-          description: "Поиск на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: spotify
-          description: "Поиск в Spotify"
-          url_template: "https://open.spotify.com/search/{query}"
-    tavern:
-      query: "medieval tavern lute folk instrumental -vocals"
-      volume: 70
+    dynamic_defaults:
+      volume: 65
       crossfade: 5
       cooldown_sec: 90
       providers:
         - name: youtube_music
-          description: "Атмосферные треки таверны на YouTube Music"
+          description: "Гибкий поиск атмосферных треков на YouTube Music"
           url_template: "https://music.youtube.com/search?q={query}"
-        - name: yandex_music
-          description: "Поиск на Яндекс Музыке"
-          url_template: "https://music.yandex.ru/search?text={query}"
-    exploration:
-      query: "fantasy ambient forest exploration instrumental -vocals"
-      volume: 60
-      crossfade: 6
-      cooldown_sec: 120
-      providers:
         - name: spotify
-          description: "Прогулки по зачарованным лесам в Spotify"
+          description: "Гибкий поиск атмосферных треков в Spotify"
           url_template: "https://open.spotify.com/search/{query}"
-        - name: apple_music
-          description: "Поиск атмосферного эмбиента в Apple Music"
-          url_template: "https://music.apple.com/us/search?term={query}"
-    ritual:
-      query: "mystic fantasy ritual choir drones instrumental -vocals"
-      volume: 50
-      crossfade: 8
-      cooldown_sec: 150
-      providers:
-        - name: youtube_music
-          description: "Хоры и ритуальные напевы на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: bandcamp
-          description: "Поиск ритуальных эмбиентов на Bandcamp"
-          url_template: "https://bandcamp.com/search?q={query}&item_type=music"
+    scenes:
+      battle:
+        query: "epic fantasy battle instrumental -vocals"
+        volume: 85
+        crossfade: 3
+        cooldown_sec: 75
+        providers:
+          - name: youtube_music
+            description: "Поиск на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: spotify
+            description: "Поиск в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+      tavern:
+        query: "medieval tavern lute folk instrumental -vocals"
+        volume: 70
+        crossfade: 5
+        cooldown_sec: 90
+        providers:
+          - name: youtube_music
+            description: "Атмосферные треки таверны на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: yandex_music
+            description: "Поиск на Яндекс Музыке"
+            url_template: "https://music.yandex.ru/search?text={query}"
+      exploration:
+        query: "fantasy ambient forest exploration instrumental -vocals"
+        volume: 60
+        crossfade: 6
+        cooldown_sec: 120
+        providers:
+          - name: spotify
+            description: "Прогулки по зачарованным лесам в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: apple_music
+            description: "Поиск атмосферного эмбиента в Apple Music"
+            url_template: "https://music.apple.com/us/search?term={query}"
+      ritual:
+        query: "mystic fantasy ritual choir drones instrumental -vocals"
+        volume: 50
+        crossfade: 8
+        cooldown_sec: 150
+        providers:
+          - name: youtube_music
+            description: "Хоры и ритуальные напевы на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: bandcamp
+            description: "Поиск ритуальных эмбиентов на Bandcamp"
+            url_template: "https://bandcamp.com/search?q={query}&item_type=music"
   cyberpunk:
-    battle:
-      query: "cyberpunk combat synthwave instrumental -vocals"
-      volume: 85
-      crossfade: 3
-      cooldown_sec: 75
-      providers:
-        - name: youtube_music
-          description: "Синтвейв для боев на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: deezer
-          description: "Поиск плейлистов на Deezer"
-          url_template: "https://www.deezer.com/search/{query}"
-    tavern:
-      query: "cyberpunk bar neon synth lounge instrumental -vocals"
+    dynamic_defaults:
       volume: 70
-      crossfade: 5
+      crossfade: 4
       cooldown_sec: 90
       providers:
-        - name: spotify
-          description: "Неоновые барные плейлисты в Spotify"
-          url_template: "https://open.spotify.com/search/{query}"
-        - name: soundcloud
-          description: "Найти миксы на SoundCloud"
-          url_template: "https://soundcloud.com/search/sounds?q={query}"
-    chase:
-      query: "cyberpunk high speed chase dnb instrumental -vocals"
-      volume: 80
-      crossfade: 3
-      cooldown_sec: 75
-      providers:
         - name: youtube_music
-          description: "Драм-н-бейс для погонь на YouTube Music"
+          description: "Неоновые плейлисты на YouTube Music"
           url_template: "https://music.youtube.com/search?q={query}"
         - name: deezer
-          description: "Поиск энергичных плейлистов на Deezer"
+          description: "Синтвейв и электроника на Deezer"
           url_template: "https://www.deezer.com/search/{query}"
-    infiltration:
-      query: "cyberpunk stealth ambient pulse instrumental -vocals"
-      volume: 55
-      crossfade: 6
-      cooldown_sec: 120
-      providers:
-        - name: tidal
-          description: "Хай-тек напряжение в Tidal"
-          url_template: "https://listen.tidal.com/search/{query}"
-        - name: spotify
-          description: "Неоновые стелс-эмбиенты в Spotify"
-          url_template: "https://open.spotify.com/search/{query}"
+    scenes:
+      battle:
+        query: "cyberpunk combat synthwave instrumental -vocals"
+        volume: 85
+        crossfade: 3
+        cooldown_sec: 75
+        providers:
+          - name: youtube_music
+            description: "Синтвейв для боев на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: deezer
+            description: "Поиск плейлистов на Deezer"
+            url_template: "https://www.deezer.com/search/{query}"
+      tavern:
+        query: "cyberpunk bar neon synth lounge instrumental -vocals"
+        volume: 70
+        crossfade: 5
+        cooldown_sec: 90
+        providers:
+          - name: spotify
+            description: "Неоновые барные плейлисты в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: soundcloud
+            description: "Найти миксы на SoundCloud"
+            url_template: "https://soundcloud.com/search/sounds?q={query}"
+      chase:
+        query: "cyberpunk high speed chase dnb instrumental -vocals"
+        volume: 80
+        crossfade: 3
+        cooldown_sec: 75
+        providers:
+          - name: youtube_music
+            description: "Драм-н-бейс для погонь на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: deezer
+            description: "Поиск энергичных плейлистов на Deezer"
+            url_template: "https://www.deezer.com/search/{query}"
+      infiltration:
+        query: "cyberpunk stealth ambient pulse instrumental -vocals"
+        volume: 55
+        crossfade: 6
+        cooldown_sec: 120
+        providers:
+          - name: tidal
+            description: "Хай-тек напряжение в Tidal"
+            url_template: "https://listen.tidal.com/search/{query}"
+          - name: spotify
+            description: "Неоновые стелс-эмбиенты в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
   sci-fi:
-    battle:
-      query: "space opera battle orchestral instrumental -vocals"
-      volume: 85
-      crossfade: 3
-      cooldown_sec: 75
-      providers:
-        - name: youtube_music
-          description: "Эпические космические битвы на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: apple_music
-          description: "Поиск на Apple Music"
-          url_template: "https://music.apple.com/us/search?term={query}"
-    exploration:
-      query: "sci fi ambient exploration instrumental -vocals"
+    dynamic_defaults:
       volume: 65
       crossfade: 4
       cooldown_sec: 90
       providers:
         - name: spotify
-          description: "Космический эмбиент в Spotify"
+          description: "Космические подборки в Spotify"
           url_template: "https://open.spotify.com/search/{query}"
         - name: youtube_music
-          description: "Атмосферные плейлисты на YouTube Music"
+          description: "Галактический поиск на YouTube Music"
           url_template: "https://music.youtube.com/search?q={query}"
-    research:
-      query: "sci fi laboratory pulses minimal instrumental -vocals"
-      volume: 55
-      crossfade: 5
-      cooldown_sec: 120
-      providers:
-        - name: apple_music
-          description: "Научные синтезаторы в Apple Music"
-          url_template: "https://music.apple.com/us/search?term={query}"
-        - name: deezer
-          description: "Поиск лабораторных эмбиентов на Deezer"
-          url_template: "https://www.deezer.com/search/{query}"
-    anomaly:
-      query: "cosmic horror anomaly textures instrumental -vocals"
-      volume: 50
-      crossfade: 7
-      cooldown_sec: 150
-      providers:
-        - name: youtube_music
-          description: "Загадочные сигналы на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: spotify
-          description: "Инопланетные звуки в Spotify"
-          url_template: "https://open.spotify.com/search/{query}"
+    scenes:
+      battle:
+        query: "space opera battle orchestral instrumental -vocals"
+        volume: 85
+        crossfade: 3
+        cooldown_sec: 75
+        providers:
+          - name: youtube_music
+            description: "Эпические космические битвы на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: apple_music
+            description: "Поиск на Apple Music"
+            url_template: "https://music.apple.com/us/search?term={query}"
+      exploration:
+        query: "sci fi ambient exploration instrumental -vocals"
+        volume: 65
+        crossfade: 4
+        cooldown_sec: 90
+        providers:
+          - name: spotify
+            description: "Космический эмбиент в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: youtube_music
+            description: "Атмосферные плейлисты на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+      research:
+        query: "sci fi laboratory pulses minimal instrumental -vocals"
+        volume: 55
+        crossfade: 5
+        cooldown_sec: 120
+        providers:
+          - name: apple_music
+            description: "Научные синтезаторы в Apple Music"
+            url_template: "https://music.apple.com/us/search?term={query}"
+          - name: deezer
+            description: "Поиск лабораторных эмбиентов на Deezer"
+            url_template: "https://www.deezer.com/search/{query}"
+      anomaly:
+        query: "cosmic horror anomaly textures instrumental -vocals"
+        volume: 50
+        crossfade: 7
+        cooldown_sec: 150
+        providers:
+          - name: youtube_music
+            description: "Загадочные сигналы на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: spotify
+            description: "Инопланетные звуки в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
   horror:
-    tension:
-      query: "dark horror suspense ambient drone instrumental -vocals"
-      volume: 60
-      crossfade: 4
-      cooldown_sec: 90
-      providers:
-        - name: youtube_music
-          description: "Жуткие эмбиентные треки на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: spotify
-          description: "Хоррор-плейлисты в Spotify"
-          url_template: "https://open.spotify.com/search/{query}"
-    exploration:
-      query: "creepy dungeon ambient instrumental -vocals"
+    dynamic_defaults:
       volume: 55
       crossfade: 5
       cooldown_sec: 90
       providers:
-        - name: soundcloud
-          description: "Поиск жутких эмбиентов на SoundCloud"
-          url_template: "https://soundcloud.com/search/sounds?q={query}"
         - name: youtube_music
-          description: "Темные данжи на YouTube Music"
+          description: "Гибкий хоррор-поиск на YouTube Music"
           url_template: "https://music.youtube.com/search?q={query}"
-    ritual:
-      query: "occult ritual chanting bells instrumental -vocals"
-      volume: 45
-      crossfade: 8
-      cooldown_sec: 150
-      providers:
         - name: spotify
-          description: "Темные обряды в Spotify"
+          description: "Жуткие подборки в Spotify"
           url_template: "https://open.spotify.com/search/{query}"
-        - name: bandcamp
-          description: "Ритуальные эмбиенты на Bandcamp"
-          url_template: "https://bandcamp.com/search?q={query}&item_type=music"
-    pursuit:
-      query: "horror chase heartbeat percussion instrumental -vocals"
-      volume: 75
-      crossfade: 4
-      cooldown_sec: 90
-      providers:
-        - name: youtube_music
-          description: "Напряженные погони на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: tidal
-          description: "Перкуссионный ужас в Tidal"
-          url_template: "https://listen.tidal.com/search/{query}"
+    scenes:
+      tension:
+        query: "dark horror suspense ambient drone instrumental -vocals"
+        volume: 60
+        crossfade: 4
+        cooldown_sec: 90
+        providers:
+          - name: youtube_music
+            description: "Жуткие эмбиентные треки на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: spotify
+            description: "Хоррор-плейлисты в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+      exploration:
+        query: "creepy dungeon ambient instrumental -vocals"
+        volume: 55
+        crossfade: 5
+        cooldown_sec: 90
+        providers:
+          - name: soundcloud
+            description: "Поиск жутких эмбиентов на SoundCloud"
+            url_template: "https://soundcloud.com/search/sounds?q={query}"
+          - name: youtube_music
+            description: "Темные данжи на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+      ritual:
+        query: "occult ritual chanting bells instrumental -vocals"
+        volume: 45
+        crossfade: 8
+        cooldown_sec: 150
+        providers:
+          - name: spotify
+            description: "Темные обряды в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: bandcamp
+            description: "Ритуальные эмбиенты на Bandcamp"
+            url_template: "https://bandcamp.com/search?q={query}&item_type=music"
+      pursuit:
+        query: "horror chase heartbeat percussion instrumental -vocals"
+        volume: 75
+        crossfade: 4
+        cooldown_sec: 90
+        providers:
+          - name: youtube_music
+            description: "Напряженные погони на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: tidal
+            description: "Перкуссионный ужас в Tidal"
+            url_template: "https://listen.tidal.com/search/{query}"
   post_apocalyptic:
-    wasteland_travel:
-      query: "post apocalyptic acoustic wanderer instrumental -vocals"
+    dynamic_defaults:
       volume: 65
       crossfade: 5
       cooldown_sec: 120
       providers:
         - name: spotify
-          description: "Пыльные дороги в Spotify"
+          description: "Поиск музыки пустошей в Spotify"
           url_template: "https://open.spotify.com/search/{query}"
         - name: youtube_music
-          description: "Блуждания по пустошам на YouTube Music"
+          description: "Поиск музыки пустошей на YouTube Music"
           url_template: "https://music.youtube.com/search?q={query}"
-    raider_attack:
-      query: "post apocalyptic battle percussion guitars instrumental -vocals"
-      volume: 80
-      crossfade: 4
-      cooldown_sec: 90
-      providers:
-        - name: deezer
-          description: "Рейдерские нападения на Deezer"
-          url_template: "https://www.deezer.com/search/{query}"
-        - name: yandex_music
-          description: "Поиск агрессивных плейлистов на Яндекс Музыке"
-          url_template: "https://music.yandex.ru/search?text={query}"
+    scenes:
+      wasteland_travel:
+        query: "post apocalyptic acoustic wanderer instrumental -vocals"
+        volume: 65
+        crossfade: 5
+        cooldown_sec: 120
+        providers:
+          - name: spotify
+            description: "Пыльные дороги в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: youtube_music
+            description: "Блуждания по пустошам на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+      raider_attack:
+        query: "post apocalyptic battle percussion guitars instrumental -vocals"
+        volume: 80
+        crossfade: 4
+        cooldown_sec: 90
+        providers:
+          - name: deezer
+            description: "Рейдерские нападения на Deezer"
+            url_template: "https://www.deezer.com/search/{query}"
+          - name: yandex_music
+            description: "Поиск агрессивных плейлистов на Яндекс Музыке"
+            url_template: "https://music.yandex.ru/search?text={query}"
   steampunk:
-    airship_voyage:
-      query: "steampunk airship adventure instrumental -vocals"
-      volume: 70
+    dynamic_defaults:
+      volume: 65
       crossfade: 5
       cooldown_sec: 120
       providers:
         - name: spotify
-          description: "Дирижабельные приключения в Spotify"
+          description: "Паровые приключения в Spotify"
           url_template: "https://open.spotify.com/search/{query}"
         - name: bandcamp
-          description: "Паровой стимпанк на Bandcamp"
+          description: "Атмосферные находки на Bandcamp"
           url_template: "https://bandcamp.com/search?q={query}&item_type=music"
-    clockwork_heist:
-      query: "steampunk heist clockwork jazz instrumental -vocals"
-      volume: 65
-      crossfade: 6
-      cooldown_sec: 120
-      providers:
-        - name: youtube_music
-          description: "Механические аферы на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: apple_music
-          description: "Поиск механического джаза в Apple Music"
-          url_template: "https://music.apple.com/us/search?term={query}"
+    scenes:
+      airship_voyage:
+        query: "steampunk airship adventure instrumental -vocals"
+        volume: 70
+        crossfade: 5
+        cooldown_sec: 120
+        providers:
+          - name: spotify
+            description: "Дирижабельные приключения в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: bandcamp
+            description: "Паровой стимпанк на Bandcamp"
+            url_template: "https://bandcamp.com/search?q={query}&item_type=music"
+      clockwork_heist:
+        query: "steampunk heist clockwork jazz instrumental -vocals"
+        volume: 65
+        crossfade: 6
+        cooldown_sec: 120
+        providers:
+          - name: youtube_music
+            description: "Механические аферы на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: apple_music
+            description: "Поиск механического джаза в Apple Music"
+            url_template: "https://music.apple.com/us/search?term={query}"
   modern_espionage:
-    stakeout:
-      query: "spy thriller tension pulses instrumental -vocals"
-      volume: 55
+    dynamic_defaults:
+      volume: 60
       crossfade: 5
       cooldown_sec: 90
       providers:
         - name: tidal
-          description: "Наблюдение и напряжение в Tidal"
+          description: "Напряженные расследования в Tidal"
           url_template: "https://listen.tidal.com/search/{query}"
         - name: spotify
-          description: "Шпионские пульсации в Spotify"
+          description: "Шпионские ритмы в Spotify"
           url_template: "https://open.spotify.com/search/{query}"
-    action:
-      query: "modern spy action hybrid orchestral instrumental -vocals"
-      volume: 75
-      crossfade: 4
-      cooldown_sec: 90
-      providers:
-        - name: youtube_music
-          description: "Экшен-шпионаж на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: soundcloud
-          description: "Современные шпионские биты на SoundCloud"
-          url_template: "https://soundcloud.com/search/sounds?q={query}"
+    scenes:
+      stakeout:
+        query: "spy thriller tension pulses instrumental -vocals"
+        volume: 55
+        crossfade: 5
+        cooldown_sec: 90
+        providers:
+          - name: tidal
+            description: "Наблюдение и напряжение в Tidal"
+            url_template: "https://listen.tidal.com/search/{query}"
+          - name: spotify
+            description: "Шпионские пульсации в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+      action:
+        query: "modern spy action hybrid orchestral instrumental -vocals"
+        volume: 75
+        crossfade: 4
+        cooldown_sec: 90
+        providers:
+          - name: youtube_music
+            description: "Экшен-шпионаж на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: soundcloud
+            description: "Современные шпионские биты на SoundCloud"
+            url_template: "https://soundcloud.com/search/sounds?q={query}"
   pirate:
-    high_seas:
-      query: "pirate adventure orchestral shanty instrumental -vocals"
-      volume: 80
+    dynamic_defaults:
+      volume: 70
       crossfade: 5
       cooldown_sec: 120
       providers:
@@ -281,70 +364,107 @@ genres:
           description: "Морские приключения в Spotify"
           url_template: "https://open.spotify.com/search/{query}"
         - name: youtube_music
-          description: "Шанти и оркестры на YouTube Music"
+          description: "Морские приключения на YouTube Music"
           url_template: "https://music.youtube.com/search?q={query}"
-    tavern_brawl:
-      query: "pirate tavern fight fiddle instrumental -vocals"
-      volume: 75
-      crossfade: 5
-      cooldown_sec: 120
-      providers:
-        - name: bandcamp
-          description: "Пиратские драки на Bandcamp"
-          url_template: "https://bandcamp.com/search?q={query}&item_type=music"
-        - name: yandex_music
-          description: "Веселые потасовки на Яндекс Музыке"
-          url_template: "https://music.yandex.ru/search?text={query}"
+    scenes:
+      high_seas:
+        query: "pirate adventure orchestral shanty instrumental -vocals"
+        volume: 80
+        crossfade: 5
+        cooldown_sec: 120
+        providers:
+          - name: spotify
+            description: "Морские приключения в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: youtube_music
+            description: "Шанти и оркестры на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+      tavern_brawl:
+        query: "pirate tavern fight fiddle instrumental -vocals"
+        volume: 75
+        crossfade: 5
+        cooldown_sec: 120
+        providers:
+          - name: bandcamp
+            description: "Пиратские драки на Bandcamp"
+            url_template: "https://bandcamp.com/search?q={query}&item_type=music"
+          - name: yandex_music
+            description: "Веселые потасовки на Яндекс Музыке"
+            url_template: "https://music.yandex.ru/search?text={query}"
   wild_west:
-    duel:
-      query: "wild west duel spaghetti western instrumental -vocals"
-      volume: 75
-      crossfade: 3
-      cooldown_sec: 90
-      providers:
-        - name: youtube_music
-          description: "Дуэли в стиле вестерн на YouTube Music"
-          url_template: "https://music.youtube.com/search?q={query}"
-        - name: spotify
-          description: "Спагетти-вестерн в Spotify"
-          url_template: "https://open.spotify.com/search/{query}"
-    travel:
-      query: "western frontier travel acoustic instrumental -vocals"
+    dynamic_defaults:
       volume: 65
       crossfade: 5
       cooldown_sec: 120
       providers:
-        - name: deezer
-          description: "Поиск дорог фронтира на Deezer"
-          url_template: "https://www.deezer.com/search/{query}"
-        - name: apple_music
-          description: "Песни ковбоев в Apple Music"
-          url_template: "https://music.apple.com/us/search?term={query}"
-  mythic:
-    celestial:
-      query: "mythic celestial choir ambient instrumental -vocals"
-      volume: 55
-      crossfade: 7
-      cooldown_sec: 150
-      providers:
-        - name: spotify
-          description: "Небесные хоры в Spotify"
-          url_template: "https://open.spotify.com/search/{query}"
         - name: youtube_music
-          description: "Возвышенные напевы на YouTube Music"
+          description: "Поиск вестерн-плейлистов на YouTube Music"
           url_template: "https://music.youtube.com/search?q={query}"
-    underworld:
-      query: "mythic underworld dark ambient instrumental -vocals"
-      volume: 50
+        - name: apple_music
+          description: "Поиск вестерн-плейлистов в Apple Music"
+          url_template: "https://music.apple.com/us/search?term={query}"
+    scenes:
+      duel:
+        query: "wild west duel spaghetti western instrumental -vocals"
+        volume: 75
+        crossfade: 3
+        cooldown_sec: 90
+        providers:
+          - name: youtube_music
+            description: "Дуэли в стиле вестерн на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+          - name: spotify
+            description: "Спагетти-вестерн в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+      travel:
+        query: "western frontier travel acoustic instrumental -vocals"
+        volume: 65
+        crossfade: 5
+        cooldown_sec: 120
+        providers:
+          - name: deezer
+            description: "Поиск дорог фронтира на Deezer"
+            url_template: "https://www.deezer.com/search/{query}"
+          - name: apple_music
+            description: "Песни ковбоев в Apple Music"
+            url_template: "https://music.apple.com/us/search?term={query}"
+  mythic:
+    dynamic_defaults:
+      volume: 55
       crossfade: 6
       cooldown_sec: 150
       providers:
-        - name: tidal
-          description: "Подземные реки в Tidal"
-          url_template: "https://listen.tidal.com/search/{query}"
-        - name: bandcamp
-          description: "Мифические глубины на Bandcamp"
-          url_template: "https://bandcamp.com/search?q={query}&item_type=music"
+        - name: spotify
+          description: "Мифические эмбиенты в Spotify"
+          url_template: "https://open.spotify.com/search/{query}"
+        - name: youtube_music
+          description: "Мифические эмбиенты на YouTube Music"
+          url_template: "https://music.youtube.com/search?q={query}"
+    scenes:
+      celestial:
+        query: "mythic celestial choir ambient instrumental -vocals"
+        volume: 55
+        crossfade: 7
+        cooldown_sec: 150
+        providers:
+          - name: spotify
+            description: "Небесные хоры в Spotify"
+            url_template: "https://open.spotify.com/search/{query}"
+          - name: youtube_music
+            description: "Возвышенные напевы на YouTube Music"
+            url_template: "https://music.youtube.com/search?q={query}"
+      underworld:
+        query: "mythic underworld dark ambient instrumental -vocals"
+        volume: 50
+        crossfade: 6
+        cooldown_sec: 150
+        providers:
+          - name: tidal
+            description: "Подземные реки в Tidal"
+            url_template: "https://listen.tidal.com/search/{query}"
+          - name: bandcamp
+            description: "Мифические глубины на Bandcamp"
+            url_template: "https://bandcamp.com/search?q={query}&item_type=music"
 
 hysteresis:
   min_confidence: 0.6

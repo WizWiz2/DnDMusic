@@ -85,14 +85,37 @@ def test_recommend_without_ai(service: MusicService) -> None:
         service.recommend("fantasy", ["battle"])
 
 
-def test_recommend_invalid_scene(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_recommend_unknown_scene_uses_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+
+    class StubAI:
+        def recommend_scene(self, genre: str, tags):
+            assert genre == "fantasy"
+            assert tags
+            return ScenePrediction(scene="Mysterious Bazaar", confidence=0.42, reason="stub")
+
+    service = MusicService(load_config(), ai_client=StubAI())
+
+    result = service.recommend("fantasy", ["market"])
+    assert result.scene == "mysterious_bazaar"
+    assert result.query == "Mysterious Bazaar"
+    assert result.confidence == 0.42
+    assert result.playlists
+    assert "Mysterious+Bazaar" in str(result.playlists[0].url)
+
+
+def test_recommend_without_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+
+    config = load_config().model_copy(deep=True)
+    config.genres["horror"].dynamic_defaults = None
 
     class WrongAI:
         def recommend_scene(self, genre: str, tags):
-            return ScenePrediction(scene="nonexistent")
+            assert genre == "horror"
+            return ScenePrediction(scene="unknown nightmare", confidence=0.3)
 
-    broken_service = MusicService(load_config(), ai_client=WrongAI())
+    service = MusicService(config, ai_client=WrongAI())
 
     with pytest.raises(RecommendationUnavailableError):
-        broken_service.recommend("fantasy", ["battle"])
+        service.recommend("horror", ["nightmare"])
