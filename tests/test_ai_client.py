@@ -11,10 +11,10 @@ def test_neural_client_success() -> None:
         assert request.method == "POST"
         payload = json.loads(request.content.decode())
         inputs = payload["inputs"]
-        assert inputs["genre"] == "fantasy"
-        assert inputs["tags"] == ["battle"]
-        assert inputs["prompt"] == "Жанр: fantasy. Теги: battle"
-        assert inputs["tags_text"] == "battle"
+        assert inputs == {"prompt": "Жанр: fantasy. Теги: battle"}
+        assert payload["parameters"]["genre"] == "fantasy"
+        assert payload["parameters"]["tags"] == ["battle"]
+        assert payload["parameters"]["tags_text"] == "battle"
         return httpx.Response(200, json={"scene": "battle", "confidence": 0.88, "reason": "stub"})
 
     client = NeuralTaggerClient(endpoint="http://test", transport=httpx.MockTransport(handler))
@@ -36,8 +36,8 @@ def test_neural_client_error_status() -> None:
 def test_neural_client_nested_scene() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content.decode())
-        assert payload["inputs"]["prompt"] == "Жанр: fantasy. Теги: battle, dragons"
-        assert payload["inputs"]["tags_text"] == "battle, dragons"
+        assert payload["inputs"] == {"prompt": "Жанр: fantasy. Теги: battle, dragons"}
+        assert payload["parameters"]["tags_text"] == "battle, dragons"
         return httpx.Response(
             200,
             json={
@@ -58,9 +58,9 @@ def test_neural_client_nested_scene() -> None:
 def test_neural_client_fallback_prompt() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content.decode())
-        assert payload["inputs"]["tags"] == []
-        assert payload["inputs"]["prompt"] == "Жанр: fantasy"
-        assert "tags_text" not in payload["inputs"]
+        assert payload["inputs"] == {"prompt": "Жанр: fantasy"}
+        assert "tags" not in payload.get("parameters", {})
+        assert "tags_text" not in payload.get("parameters", {})
         return httpx.Response(200, json={"scene": "city"})
 
     client = NeuralTaggerClient(endpoint="http://test", transport=httpx.MockTransport(handler))
@@ -71,9 +71,8 @@ def test_neural_client_fallback_prompt() -> None:
 def test_neural_client_prompt_without_genre_and_tags() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content.decode())
-        assert payload["inputs"]["genre"] == ""
-        assert payload["inputs"]["tags"] == []
-        assert payload["inputs"]["prompt"] == "Музыкальная сцена"
+        assert payload["inputs"] == {"prompt": "Музыкальная сцена"}
+        assert "parameters" not in payload
         return httpx.Response(200, json={"scene": "mystery"})
 
     client = NeuralTaggerClient(endpoint="http://test", transport=httpx.MockTransport(handler))
