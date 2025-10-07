@@ -1,7 +1,7 @@
 import json
 
-import pytest
 import httpx
+import pytest
 
 from app.ai_client import NeuralTaggerClient, NeuralTaggerError
 
@@ -90,3 +90,21 @@ def test_neural_client_error_contains_details() -> None:
         client.recommend_scene("fantasy", ["battle"])
 
     assert "Не удалось обратиться к сервису рекомендаций (http://test): boom" in str(error.value)
+
+
+def test_neural_client_timeout_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MUSIC_AI_TIMEOUT", "12.5")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"scene": "battle"})
+
+    client = NeuralTaggerClient(endpoint="http://test", transport=httpx.MockTransport(handler))
+    assert client._timeout == pytest.approx(12.5)
+    client.recommend_scene("fantasy", ["battle"])
+
+
+def test_neural_client_timeout_env_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MUSIC_AI_TIMEOUT", "not-a-number")
+
+    with pytest.raises(ValueError):
+        NeuralTaggerClient()
