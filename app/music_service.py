@@ -206,14 +206,7 @@ class MusicService:
             if self._normalize_token(scene_id) == normalized_scene:
                 return scene_id
 
-        prediction_tokens = [
-            token
-            for token in (
-                self._normalize_token(raw)
-                for raw in re.split(r"[^a-z0-9]+", scene_name.lower())
-            )
-            if token
-        ]
+        prediction_tokens = self._tokenize(scene_name)
 
         for scene_id in scenes.keys():
             normalized_id = self._normalize_token(scene_id)
@@ -224,5 +217,14 @@ class MusicService:
 
     @staticmethod
     def _normalize_token(value: str) -> str:
-        tokens = [part for part in re.split(r"[^a-z0-9]+", value.lower()) if part]
+        tokens = MusicService._tokenize(value)
         return "_".join(tokens)
+
+    @staticmethod
+    def _tokenize(value: str) -> List[str]:
+        normalized_value = value.lower().replace("_", " ")
+        return [
+            part
+            for part in re.split(r"[^\w]+", normalized_value, flags=re.UNICODE)
+            if part
+        ]

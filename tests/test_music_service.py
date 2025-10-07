@@ -119,3 +119,24 @@ def test_recommend_without_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(RecommendationUnavailableError):
         service.recommend("horror", ["nightmare"])
+
+
+def test_recommend_unknown_cyrillic_scene_uses_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MUSIC_CONFIG_PATH", "config/default.yaml")
+
+    class StubAI:
+        def recommend_scene(self, genre: str, tags):
+            assert genre == "fantasy"
+            assert tags
+            return ScenePrediction(
+                scene="Драконья Пещера", confidence=0.33, reason="stub"
+            )
+
+    service = MusicService(load_config(), ai_client=StubAI())
+
+    result = service.recommend("fantasy", ["dragon"])
+    assert result.scene == "драконья_пещера"
+    assert result.query == "Драконья Пещера"
+    assert result.playlists
