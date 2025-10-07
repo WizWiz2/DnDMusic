@@ -79,3 +79,14 @@ def test_neural_client_prompt_without_genre_and_tags() -> None:
     client = NeuralTaggerClient(endpoint="http://test", transport=httpx.MockTransport(handler))
     prediction = client.recommend_scene("", [" ", ""])
     assert prediction.scene == "mystery"
+
+
+def test_neural_client_error_contains_details() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("boom", request=request)
+
+    client = NeuralTaggerClient(endpoint="http://test", transport=httpx.MockTransport(handler))
+    with pytest.raises(NeuralTaggerError) as error:
+        client.recommend_scene("fantasy", ["battle"])
+
+    assert "Не удалось обратиться к сервису рекомендаций (http://test): boom" in str(error.value)
