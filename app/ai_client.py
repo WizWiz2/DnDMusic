@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import Iterable, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -53,7 +54,11 @@ class NeuralTaggerClient:
                 normalized_tags.append(tag_text)
         genre_text = str(genre).strip()
         prompt = self._build_prompt(genre_text, normalized_tags)
-        inputs_payload: dict[str, object] = {"prompt": prompt}
+        inputs_payload: object
+        if self._should_use_plain_prompt():
+            inputs_payload = prompt
+        else:
+            inputs_payload = {"prompt": prompt}
 
         payload: dict[str, object] = {"inputs": inputs_payload}
         headers = {"Content-Type": "application/json"}
@@ -147,3 +152,15 @@ class NeuralTaggerClient:
                 ) from exc
 
         return DEFAULT_TIMEOUT
+
+    def _should_use_plain_prompt(self) -> bool:
+        if not self._endpoint:
+            return False
+        try:
+            parsed = urlparse(self._endpoint)
+        except ValueError:
+            return False
+        host = (parsed.hostname or "").lower()
+        if not host:
+            return False
+        return host.endswith("huggingface.co") or host.endswith("hf.space")

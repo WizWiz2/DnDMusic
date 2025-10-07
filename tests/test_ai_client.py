@@ -53,6 +53,21 @@ def test_neural_client_nested_scene() -> None:
     assert prediction.reason == "extra"
 
 
+def test_neural_client_huggingface_payload() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode())
+        assert payload["inputs"] == "Жанр: fantasy. Теги: battle"
+        return httpx.Response(200, json={"scene": "battle"})
+
+    client = NeuralTaggerClient(
+        endpoint="https://api-inference.huggingface.co/models/demo",
+        transport=httpx.MockTransport(handler),
+    )
+
+    prediction = client.recommend_scene("fantasy", ["battle"])
+    assert prediction.scene == "battle"
+
+
 def test_neural_client_fallback_prompt() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content.decode())
