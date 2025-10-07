@@ -771,6 +771,16 @@
       let youtubeApiRequested = false;
       let youtubeApiReady = false;
       const youtubeApiQueue = [];
+      let youtubeApiPollerActive = false;
+
+      function scheduleYouTubeApiCheck(callback) {
+        const raf = window.requestAnimationFrame;
+        if (typeof raf === "function") {
+          raf(callback);
+        } else {
+          setTimeout(callback, 80);
+        }
+      }
 
       function flushYouTubeQueue() {
         if (!youtubeApiReady || !window.YT || !window.YT.Player) {
@@ -786,6 +796,25 @@
         }
       }
 
+      function startYouTubeApiPolling() {
+        if (youtubeApiPollerActive) {
+          return;
+        }
+        youtubeApiPollerActive = true;
+
+        const poll = () => {
+          if (window.YT && typeof window.YT.Player === "function") {
+            youtubeApiReady = true;
+            youtubeApiPollerActive = false;
+            flushYouTubeQueue();
+            return;
+          }
+          scheduleYouTubeApiCheck(poll);
+        };
+
+        poll();
+      }
+
       function ensureYouTubeApiLoaded(callback) {
         if (window.YT && typeof window.YT.Player === "function") {
           youtubeApiReady = true;
@@ -794,6 +823,7 @@
         }
 
         youtubeApiQueue.push(callback);
+        startYouTubeApiPolling();
 
         if (youtubeApiRequested) {
           return;
