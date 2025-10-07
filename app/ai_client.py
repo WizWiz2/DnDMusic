@@ -68,7 +68,13 @@ class NeuralTaggerClient:
             with httpx.Client(timeout=self._timeout, transport=self._transport) as client:
                 response = client.post(self._endpoint, json=payload, headers=headers)
         except httpx.HTTPError as exc:  # pragma: no cover - сеть может вести себя по-разному
-            raise NeuralTaggerError("Не удалось обратиться к сервису рекомендаций") from exc
+            details = str(exc).strip()
+            message = "Не удалось обратиться к сервису рекомендаций"
+            if self._endpoint:
+                message = f"{message} ({self._endpoint})"
+            if details:
+                message = f"{message}: {details}"
+            raise NeuralTaggerError(message) from exc
 
         if response.status_code != 200:
             raise NeuralTaggerError(
