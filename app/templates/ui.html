@@ -770,11 +770,14 @@
 
       // --- YouTube IFrame API ---
       let ytPlayer = null;
+      let ytPlayerReady = false;
       let lastSetVolume = 70;
       let isUserGestureUnlocked = false;
       let isFading = false;
       let lastQuery = null;
       let lastMeta = null;
+      let lastPlaylistRequest = null;
+      let shouldLoadWhenReady = false;
       let youtubeApiRequested = false;
       let youtubeApiReady = false;
       const youtubeApiQueue = [];
@@ -860,6 +863,7 @@
 
       function createOrGetPlayer() {
         if (ytPlayer) return ytPlayer;
+        ytPlayerReady = false;
         ytPlayer = new YT.Player('player', {
           height: '390',
           width: '640',
@@ -873,6 +877,14 @@
           events: {
             onReady: () => {
               try { ytPlayer.setVolume(lastSetVolume); } catch {}
+              ytPlayerReady = true;
+              if (shouldLoadWhenReady && lastPlaylistRequest) {
+                try {
+                  performPlaylistLoad(ytPlayer, lastPlaylistRequest);
+                } finally {
+                  shouldLoadWhenReady = false;
+                }
+              }
             },
             onStateChange: (e) => {
               // If video is cued but not playing, try to start playback per policy
@@ -907,45 +919,68 @@
         } catch {}
       }
 
+      function performPlaylistLoad(player, request) {
+        if (!player || !request) return;
+        const { query, desiredVol, crossfadeSec } = request;
+
+        const doPlay = () => {
+          try {
+            // Играем поисковую выдачу по запросу как плейлист
+            player.loadPlaylist({ listType: 'search', list: query, index: 0 });
+            // В некоторых браузерах нужно явное playVideo после loadPlaylist
+            setTimeout(() => { try { if (isUserGestureUnlocked) player.playVideo(); } catch {} }, 200);
+            // Плавная установка громкости
+            setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
+          } catch (e) {
+            console.error(e);
+          }
+        };
+
+        // Если пользователь ещё не разблокировал автоплей — запросим кликом
+        if (!isUserGestureUnlocked) {
+          // Попытка тихого старта: mute -> play -> unmute по клику
+          try { player.mute(); } catch {}
+          doPlay();
+        } else {
+          // Мягкий кроссфейд: сначала приглушим текущий звук, затем загрузим новый список
+          if (!isFading) {
+            isFading = true;
+            setVolumeSmooth(0, Math.max(150, crossfadeSec * 500));
+            setTimeout(() => {
+              doPlay();
+              isFading = false;
+            }, Math.max(160, crossfadeSec * 520));
+          } else {
+            doPlay();
+          }
+        }
+
+        lastPlaylistRequest = request;
+      }
+
       function playSearchOnYouTube(query, meta) {
         ensureYouTubeApiLoaded(() => {
           const player = createOrGetPlayer();
           const desiredVol = Number(meta?.volume ?? playerVolumeInput.value ?? 70);
           const crossfadeSec = Number(meta?.crossfade ?? 3);
-          lastQuery = String(query || '');
+          const normalizedQuery = String(query || '');
+          lastQuery = normalizedQuery;
           lastMeta = meta || null;
 
-          const doPlay = () => {
-            try {
-              // Играем поисковую выдачу по запросу как плейлист
-              player.loadPlaylist({ listType: 'search', list: query, index: 0 });
-              // В некоторых браузерах нужно явное playVideo после loadPlaylist
-              setTimeout(() => { try { if (isUserGestureUnlocked) player.playVideo(); } catch {} }, 200);
-              // Плавная установка громкости
-              setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
-            } catch (e) {
-              console.error(e);
-            }
+          const request = {
+            query: normalizedQuery,
+            desiredVol,
+            crossfadeSec,
           };
+          lastPlaylistRequest = request;
 
-          // Если пользователь ещё не разблокировал автоплей — запросим кликом
-          if (!isUserGestureUnlocked) {
-            // Попытка тихого старта: mute -> play -> unmute по клику
-            try { player.mute(); } catch {}
-            doPlay();
-          } else {
-            // Мягкий кроссфейд: сначала приглушим текущий звук, затем загрузим новый список
-            if (!isFading) {
-              isFading = true;
-              setVolumeSmooth(0, Math.max(150, crossfadeSec * 500));
-              setTimeout(() => {
-                doPlay();
-                isFading = false;
-              }, Math.max(160, crossfadeSec * 520));
-            } else {
-              doPlay();
-            }
+          if (!ytPlayerReady) {
+            shouldLoadWhenReady = true;
+            return;
           }
+
+          shouldLoadWhenReady = false;
+          performPlaylistLoad(player, request);
         });
       }
 
