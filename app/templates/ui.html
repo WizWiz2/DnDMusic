@@ -936,10 +936,16 @@
           }
         };
 
+        const state = typeof player.getPlayerState === 'function' ? player.getPlayerState() : null;
+        const YTState = window.YT?.PlayerState;
+        const isActive = YTState && (state === YTState.PLAYING || state === YTState.BUFFERING);
+
         // Если пользователь ещё не разблокировал автоплей — запросим кликом
         if (!isUserGestureUnlocked) {
           // Попытка тихого старта: mute -> play -> unmute по клику
           try { player.mute(); } catch {}
+          doPlay();
+        } else if (!isActive) {
           doPlay();
         } else {
           // Мягкий кроссфейд: сначала приглушим текущий звук, затем загрузим новый список
