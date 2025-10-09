@@ -736,6 +736,13 @@
         // Автовоспроизведение через YouTube search, если есть запрос
         if (result.query) {
           playSearchOnYouTube(result.query, meta);
+          if (meta && meta.volume !== undefined && meta.volume !== null) {
+            const metaVolume = Number(meta.volume);
+            if (!Number.isNaN(metaVolume)) {
+              playerVolumeInput.value = String(metaVolume);
+              lastSetVolume = metaVolume;
+            }
+          }
         }
 
         if (Array.isArray(result.tags)) {
