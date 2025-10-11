@@ -391,7 +391,7 @@
                     </label>
                     <button id="provider-open" type="button" class="secondary">🔗 Открыть</button>
                   </div>
-                  <p class="status">Совет: нажмите Play один раз, чтобы разрешить автоплеи.</p>
+                  <p class="status" id="player-status">Совет: нажмите Play один раз, чтобы разрешить автоплеи.</p>
                 </div>
                 <div class="info-block">
                   <h3>Поисковый запрос</h3>
@@ -501,6 +501,7 @@
       const sceneButtonsWrap = document.getElementById("scene-buttons");
       const searchButton = document.getElementById("search-button");
       const searchStatus = document.getElementById("search-status");
+      const playerStatus = document.getElementById("player-status");
       const resultStatus = document.getElementById("result-status");
       const resultContainer = document.getElementById("result-container");
       const resultTitle = document.getElementById("result-title");
@@ -774,6 +775,7 @@
       let lastSetVolume = 70;
       let isUserGestureUnlocked = false;
       let isFading = false;
+      let consecutivePlaybackErrors = 0;
       let lastQuery = null;
       let lastMeta = null;
       let lastPlaylistRequest = null;
@@ -782,6 +784,13 @@
       let youtubeApiReady = false;
       const youtubeApiQueue = [];
       let youtubeApiPollerActive = false;
+
+      function setPlayerStatus(message) {
+        if (!playerStatus) {
+          return;
+        }
+        playerStatus.textContent = message;
+      }
 
       function scheduleYouTubeApiCheck(callback) {
         const raf = window.requestAnimationFrame;
@@ -878,6 +887,8 @@
             onReady: () => {
               try { ytPlayer.setVolume(lastSetVolume); } catch {}
               ytPlayerReady = true;
+              consecutivePlaybackErrors = 0;
+              setPlayerStatus("Плеер готов. Выберите сцену и нажмите Play, чтобы начать воспроизведение.");
               if (shouldLoadWhenReady && lastPlaylistRequest) {
                 try {
                   performPlaylistLoad(ytPlayer, lastPlaylistRequest);
@@ -890,12 +901,51 @@
               // If video is cued but not playing, try to start playback per policy
               const YTState = window.YT?.PlayerState;
               if (!YTState) return;
+              switch (e.data) {
+                case YTState.PLAYING:
+                  consecutivePlaybackErrors = 0;
+                  setPlayerStatus("Воспроизведение запущено.");
+                  break;
+                case YTState.BUFFERING:
+                  setPlayerStatus("Буферизация…");
+                  break;
+                case YTState.PAUSED:
+                  setPlayerStatus("Воспроизведение на паузе.");
+                  break;
+                case YTState.ENDED:
+                  setPlayerStatus("Трек завершился, выбираем следующий…");
+                  break;
+                default:
+                  break;
+              }
               if (e.data === YTState.CUED) {
                 try {
                   if (isUserGestureUnlocked) {
                     ytPlayer.playVideo();
                   }
                 } catch {}
+              }
+            },
+            onError: (event) => {
+              consecutivePlaybackErrors += 1;
+              const errorCode = event?.data;
+              console.warn("YouTube playback error", errorCode);
+              if (consecutivePlaybackErrors <= 5) {
+                setPlayerStatus("Видео недоступно, переключаюсь на следующий трек…");
+                setTimeout(() => {
+                  try {
+                    if (typeof ytPlayer.nextVideo === "function") {
+                      ytPlayer.nextVideo();
+                    }
+                    if (isUserGestureUnlocked && typeof ytPlayer.playVideo === "function") {
+                      ytPlayer.playVideo();
+                    }
+                  } catch (error) {
+                    console.error("Не удалось переключить видео после ошибки", error);
+                  }
+                }, 350);
+              } else {
+                setPlayerStatus("Не удаётся воспроизвести видео. Попробуйте другой запрос.");
               }
             },
           }
@@ -922,6 +972,11 @@
       function performPlaylistLoad(player, request) {
         if (!player || !request) return;
         const { query, desiredVol, crossfadeSec } = request;
+
+        consecutivePlaybackErrors = 0;
+        if (query) {
+          setPlayerStatus(`Загружаем музыку по запросу: ${query}`);
+        }
 
         const doPlay = () => {
           try {
