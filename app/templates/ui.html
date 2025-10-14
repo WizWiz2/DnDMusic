@@ -901,6 +901,19 @@
               // If video is cued but not playing, try to start playback per policy
               const YTState = window.YT?.PlayerState;
               if (!YTState) return;
+              const stateNames = {
+                [YTState.UNSTARTED]: 'UNSTARTED',
+                [YTState.ENDED]: 'ENDED',
+                [YTState.PLAYING]: 'PLAYING',
+                [YTState.PAUSED]: 'PAUSED',
+                [YTState.BUFFERING]: 'BUFFERING',
+                [YTState.CUED]: 'CUED',
+              };
+              console.log("[YouTubePlayer] onStateChange", {
+                rawState: e.data,
+                stateName: stateNames[e.data] ?? 'UNKNOWN',
+                timestamp: Date.now(),
+              });
               switch (e.data) {
                 case YTState.PLAYING:
                   consecutivePlaybackErrors = 0;
@@ -963,10 +976,17 @@
             const v = Math.round(start + delta * t);
             ytPlayer.setVolume(v);
             lastSetVolume = v;
-            if (t < 1) requestAnimationFrame(step);
+            if (t < 1) {
+              requestAnimationFrame(step);
+            } else {
+              console.log("[setVolumeSmooth] Completed volume ramp", { target, durationMs });
+            }
           };
           requestAnimationFrame(step);
-        } catch {}
+          console.log("[setVolumeSmooth] Scheduled volume ramp", { target, durationMs, start });
+        } catch (error) {
+          console.error("[setVolumeSmooth] Failed to schedule volume ramp", error);
+        }
       }
 
       function performPlaylistLoad(player, request) {
@@ -982,10 +1002,24 @@
           try {
             // Играем поисковую выдачу по запросу как плейлист
             player.loadPlaylist({ listType: 'search', list: query, index: 0 });
+            console.log("[performPlaylistLoad] loadPlaylist invoked", { query });
             // В некоторых браузерах нужно явное playVideo после loadPlaylist
-            setTimeout(() => { try { if (isUserGestureUnlocked) player.playVideo(); } catch {} }, 200);
+            setTimeout(() => {
+              try {
+                console.log("[performPlaylistLoad] setTimeout fired after loadPlaylist", { isUserGestureUnlocked });
+                if (isUserGestureUnlocked) {
+                  player.playVideo();
+                  console.log("[performPlaylistLoad] playVideo invoked from timeout");
+                } else {
+                  console.log("[performPlaylistLoad] playVideo skipped: user gesture not unlocked");
+                }
+              } catch (error) {
+                console.error("[performPlaylistLoad] Error during delayed playVideo", error);
+              }
+            }, 200);
             // Плавная установка громкости
             setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
+            console.log("[performPlaylistLoad] Volume ramp requested", { desiredVol, crossfadeSec });
           } catch (e) {
             console.error(e);
           }
@@ -995,23 +1029,36 @@
         const YTState = window.YT?.PlayerState;
         const isActive = YTState && (state === YTState.PLAYING || state === YTState.BUFFERING);
 
+        console.log("[performPlaylistLoad] Entry", {
+          request: { query, desiredVol, crossfadeSec },
+          state,
+          isUserGestureUnlocked,
+          isActive,
+        });
+
         // Если пользователь ещё не разблокировал автоплей — запросим кликом
         if (!isUserGestureUnlocked) {
+          console.log("[performPlaylistLoad] Branch: awaiting user gesture unlock");
           // Попытка тихого старта: mute -> play -> unmute по клику
           try { player.mute(); } catch {}
           doPlay();
         } else if (!isActive) {
+          console.log("[performPlaylistLoad] Branch: player inactive, starting playback");
           doPlay();
         } else {
           // Мягкий кроссфейд: сначала приглушим текущий звук, затем загрузим новый список
           if (!isFading) {
+            console.log("[performPlaylistLoad] Branch: initiating crossfade", { crossfadeSec });
             isFading = true;
             setVolumeSmooth(0, Math.max(150, crossfadeSec * 500));
             setTimeout(() => {
+              console.log("[performPlaylistLoad] Crossfade timeout reached, loading new playlist");
               doPlay();
               isFading = false;
+              console.log("[performPlaylistLoad] Crossfade completed");
             }, Math.max(160, crossfadeSec * 520));
           } else {
+            console.log("[performPlaylistLoad] Branch: crossfade already in progress, immediate play");
             doPlay();
           }
         }
