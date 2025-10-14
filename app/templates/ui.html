@@ -929,9 +929,30 @@
             onError: (event) => {
               consecutivePlaybackErrors += 1;
               const errorCode = event?.data;
-              console.warn("YouTube playback error", errorCode);
+              const playlistIndex = ytPlayer?.getPlaylistIndex?.();
+              const playlist = ytPlayer?.getPlaylist?.();
+              const videoData = ytPlayer?.getVideoData?.();
+              const logLabel = "YouTube playback error";
+              const errorContext = {
+                errorCode,
+                lastQuery,
+                lastMeta,
+                consecutivePlaybackErrors,
+                playlistIndex,
+                playlist,
+                videoData,
+              };
+              if (typeof console.groupCollapsed === "function") {
+                console.groupCollapsed(logLabel, errorContext);
+                if (typeof console.groupEnd === "function") {
+                  console.groupEnd();
+                }
+              } else {
+                console.error(logLabel, errorContext);
+              }
+              const videoTitle = videoData?.title ? ` — ${videoData.title}` : "";
               if (consecutivePlaybackErrors <= 5) {
-                setPlayerStatus("Видео недоступно, переключаюсь на следующий трек…");
+                setPlayerStatus(`Видео недоступно (ошибка ${errorCode}${videoTitle}), переключаюсь на следующий трек…`);
                 setTimeout(() => {
                   try {
                     if (typeof ytPlayer.nextVideo === "function") {
@@ -945,7 +966,8 @@
                   }
                 }, 350);
               } else {
-                setPlayerStatus("Не удаётся воспроизвести видео. Попробуйте другой запрос.");
+                setPlayerStatus(`Не удаётся воспроизвести видео (ошибка ${errorCode}${videoTitle}). Попробуйте другой запрос.`);
+                console.error("Достигнут лимит ошибок воспроизведения, плейлист может быть заблокирован", errorContext);
               }
             },
           }
