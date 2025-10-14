@@ -145,6 +145,13 @@
         box-shadow: 0 10px 25px rgba(15, 118, 110, 0.3);
       }
 
+      .button.small,
+      button.small {
+        font-size: 0.78rem;
+        padding: 6px 12px;
+        box-shadow: none;
+      }
+
       .button:disabled,
       button:disabled {
         opacity: 0.6;
@@ -173,6 +180,54 @@
       .form-grid {
         display: grid;
         gap: 16px;
+      }
+
+      .player-log-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .player-log-title {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+
+      .player-log {
+        margin-top: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        background: rgba(255, 255, 255, 0.76);
+        font-family: "JetBrains Mono", "Fira Code", "Source Code Pro", monospace;
+        font-size: 0.78rem;
+        line-height: 1.4;
+        height: 150px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+
+      .player-log-entry + .player-log-entry {
+        margin-top: 4px;
+      }
+
+      .player-log-entry[data-level="debug"] {
+        color: #6b7280;
+        font-style: italic;
+      }
+
+      .player-log-entry[data-level="warn"] {
+        color: #b45309;
+      }
+
+      .player-log-entry[data-level="error"] {
+        color: #b91c1c;
+      }
+
+      .player-log-entry[data-level="success"] {
+        color: var(--accent);
       }
 
       .form-actions {
@@ -392,6 +447,11 @@
                     <button id="provider-open" type="button" class="secondary">🔗 Открыть</button>
                   </div>
                   <p class="status" id="player-status">Совет: нажмите Play один раз, чтобы разрешить автоплеи.</p>
+                  <div class="player-log-controls">
+                    <span class="player-log-title">Журнал плеера</span>
+                    <button id="player-log-clear" type="button" class="secondary small">Очистить</button>
+                  </div>
+                  <div id="player-log" class="player-log" aria-live="polite"></div>
                 </div>
                 <div class="info-block">
                   <h3>Поисковый запрос</h3>
@@ -502,6 +562,8 @@
       const searchButton = document.getElementById("search-button");
       const searchStatus = document.getElementById("search-status");
       const playerStatus = document.getElementById("player-status");
+      const playerLog = document.getElementById("player-log");
+      const playerLogClearBtn = document.getElementById("player-log-clear");
       const resultStatus = document.getElementById("result-status");
       const resultContainer = document.getElementById("result-container");
       const resultTitle = document.getElementById("result-title");
@@ -527,6 +589,84 @@
       const providerOpenBtn = document.getElementById("provider-open");
       const whisperToggle = document.getElementById("whisper-toggle");
       const whisperStatus = document.getElementById("whisper-status");
+
+      const PLAYER_LOG_MAX_ENTRIES = 250;
+
+      function appendPlayerLog(message, level = "info") {
+        if (!playerLog) {
+          return;
+        }
+        const levelValue = level || "info";
+        const timestamp = new Date();
+        const formattedTs = timestamp
+          .toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+          .trim();
+        const entry = document.createElement("div");
+        entry.className = "player-log-entry";
+        entry.dataset.level = levelValue;
+        entry.textContent = `[${formattedTs}] [${levelValue.toUpperCase()}] ${message}`;
+        playerLog.append(entry);
+        while (playerLog.children.length > PLAYER_LOG_MAX_ENTRIES) {
+          playerLog.removeChild(playerLog.firstChild);
+        }
+        playerLog.scrollTop = playerLog.scrollHeight;
+      }
+
+      function serializeConsoleArgs(args) {
+        return args
+          .map((value) => {
+            if (typeof value === "string") {
+              return value;
+            }
+            if (value instanceof Error) {
+              return value.stack || value.message || String(value);
+            }
+            try {
+              const json = JSON.stringify(value);
+              if (typeof json === "string") {
+                return json;
+              }
+              return String(value);
+            } catch (error) {
+              return String(value);
+            }
+          })
+          .join(" ");
+      }
+
+      if (playerLogClearBtn) {
+        playerLogClearBtn.addEventListener("click", () => {
+          if (playerLog) {
+            playerLog.innerHTML = "";
+            appendPlayerLog("Журнал очищен.", "info");
+          }
+        });
+      }
+
+      if (playerLog) {
+        const originalConsoleError = console.error.bind(console);
+        const originalConsoleWarn = console.warn.bind(console);
+        console.error = (...args) => {
+          try {
+            appendPlayerLog(serializeConsoleArgs(args), "error");
+          } catch (error) {
+            originalConsoleError("Не удалось записать ошибку в журнал", error);
+          }
+          originalConsoleError(...args);
+        };
+        console.warn = (...args) => {
+          try {
+            appendPlayerLog(serializeConsoleArgs(args), "warn");
+          } catch (error) {
+            originalConsoleError("Не удалось записать предупреждение в журнал", error);
+          }
+          originalConsoleWarn(...args);
+        };
+      }
 
       function formatLabel(value) {
         return value
@@ -785,7 +925,8 @@
       const youtubeApiQueue = [];
       let youtubeApiPollerActive = false;
 
-      function setPlayerStatus(message) {
+      function setPlayerStatus(message, level = "info") {
+        appendPlayerLog(message, level);
         if (!playerStatus) {
           return;
         }
@@ -888,7 +1029,8 @@
               try { ytPlayer.setVolume(lastSetVolume); } catch {}
               ytPlayerReady = true;
               consecutivePlaybackErrors = 0;
-              setPlayerStatus("Плеер готов. Выберите сцену и нажмите Play, чтобы начать воспроизведение.");
+              appendPlayerLog("YouTube IFrame API: плеер готов к работе.", "success");
+              setPlayerStatus("Плеер готов. Выберите сцену и нажмите Play, чтобы начать воспроизведение.", "success");
               if (shouldLoadWhenReady && lastPlaylistRequest) {
                 try {
                   performPlaylistLoad(ytPlayer, lastPlaylistRequest);
@@ -914,19 +1056,31 @@
                 stateName: stateNames[e.data] ?? 'UNKNOWN',
                 timestamp: Date.now(),
               });
+              appendPlayerLog(
+                `Состояние плеера: ${stateNames[e.data] ?? 'UNKNOWN'} (${e.data})`,
+                e.data === YTState.ENDED
+                  ? "info"
+                  : e.data === YTState.PAUSED
+                  ? "info"
+                  : e.data === YTState.BUFFERING
+                  ? "debug"
+                  : e.data === YTState.PLAYING
+                  ? "success"
+                  : "debug",
+              );
               switch (e.data) {
                 case YTState.PLAYING:
                   consecutivePlaybackErrors = 0;
-                  setPlayerStatus("Воспроизведение запущено.");
+                  setPlayerStatus("Воспроизведение запущено.", "success");
                   break;
                 case YTState.BUFFERING:
-                  setPlayerStatus("Буферизация…");
+                  setPlayerStatus("Буферизация…", "debug");
                   break;
                 case YTState.PAUSED:
-                  setPlayerStatus("Воспроизведение на паузе.");
+                  setPlayerStatus("Воспроизведение на паузе.", "info");
                   break;
                 case YTState.ENDED:
-                  setPlayerStatus("Трек завершился, выбираем следующий…");
+                  setPlayerStatus("Трек завершился, выбираем следующий…", "info");
                   break;
                 default:
                   break;
@@ -965,7 +1119,10 @@
               }
               const videoTitle = videoData?.title ? ` — ${videoData.title}` : "";
               if (consecutivePlaybackErrors <= 5) {
-                setPlayerStatus(`Видео недоступно (ошибка ${errorCode}${videoTitle}), переключаюсь на следующий трек…`);
+                setPlayerStatus(
+                  `Видео недоступно (ошибка ${errorCode}${videoTitle}), переключаюсь на следующий трек…`,
+                  "warn",
+                );
                 setTimeout(() => {
                   try {
                     if (typeof ytPlayer.nextVideo === "function") {
@@ -979,7 +1136,10 @@
                   }
                 }, 350);
               } else {
-                setPlayerStatus(`Не удаётся воспроизвести видео (ошибка ${errorCode}${videoTitle}). Попробуйте другой запрос.`);
+                setPlayerStatus(
+                  `Не удаётся воспроизвести видео (ошибка ${errorCode}${videoTitle}). Попробуйте другой запрос.`,
+                  "error",
+                );
                 console.error("Достигнут лимит ошибок воспроизведения, плейлист может быть заблокирован", errorContext);
               }
             },
@@ -1017,12 +1177,13 @@
 
         consecutivePlaybackErrors = 0;
         if (query) {
-          setPlayerStatus(`Загружаем музыку по запросу: ${query}`);
+          setPlayerStatus(`Загружаем музыку по запросу: ${query}`, "info");
         }
 
         const doPlay = () => {
           try {
             // Играем поисковую выдачу по запросу как плейлист
+            appendPlayerLog(`Запрос к YouTube: loadPlaylist → ${query}`, "debug");
             player.loadPlaylist({ listType: 'search', list: query, index: 0 });
             console.log("[performPlaylistLoad] loadPlaylist invoked", { query });
             // В некоторых браузерах нужно явное playVideo после loadPlaylist
@@ -1043,7 +1204,7 @@
             setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
             console.log("[performPlaylistLoad] Volume ramp requested", { desiredVol, crossfadeSec });
           } catch (e) {
-            console.error(e);
+            console.error("performPlaylistLoad#doPlay", e);
           }
         };
 
