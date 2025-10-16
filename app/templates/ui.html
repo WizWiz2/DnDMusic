@@ -1040,11 +1040,14 @@
         };
 
         try {
-          const { origin } = window.location || {};
-          if (typeof origin === 'string' && origin.toLowerCase().startsWith('https://')) {
+          const { protocol, origin } = window.location || {};
+          if (protocol === 'https:' && typeof origin === 'string') {
             playerVars.origin = origin;
-          } else if (origin) {
-            console.warn('[YouTubePlayer] Skipping origin hint for insecure context', { origin });
+          } else {
+            console.warn('[YouTubePlayer] Skipping origin hint for insecure context', {
+              protocol,
+              origin,
+            });
           }
         } catch (error) {
           console.warn('[YouTubePlayer] Unable to determine window origin', error);
