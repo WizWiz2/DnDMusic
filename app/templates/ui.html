@@ -1151,6 +1151,27 @@
                 console.error(logLabel, errorContext);
               }
               const videoTitle = videoData?.title ? ` — ${videoData.title}` : "";
+              const playlistItems = Array.isArray(playlist) ? playlist.length : 0;
+              const hasValidIndex = typeof playlistIndex === "number" && playlistIndex >= 0;
+              const shouldRetrySearch =
+                !hasValidIndex && playlistItems === 0 && lastPlaylistRequest && consecutivePlaybackErrors <= 4;
+
+              if (shouldRetrySearch) {
+                setPlayerStatus(
+                  `Видео недоступно (ошибка ${errorCode}${videoTitle}), повторяю поиск…`,
+                  "warn",
+                );
+                setTimeout(() => {
+                  try {
+                    appendPlayerLog("Повторная загрузка плейлиста после ошибки YouTube", "debug");
+                    performPlaylistLoad(ytPlayer, lastPlaylistRequest);
+                  } catch (error) {
+                    console.error("Не удалось повторить поиск после ошибки YouTube", error);
+                  }
+                }, 420);
+                return;
+              }
+
               if (consecutivePlaybackErrors <= 5) {
                 setPlayerStatus(
                   `Видео недоступно (ошибка ${errorCode}${videoTitle}), переключаюсь на следующий трек…`,
