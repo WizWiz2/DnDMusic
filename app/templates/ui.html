@@ -309,9 +309,29 @@
         gap: 22px;
       }
 
-      @media (min-width: 840px) {
+      .result-main {
+        width: 100%;
+      }
+
+      .result-details {
+        width: 100%;
+      }
+
+      @media (min-width: 960px) {
         .result-body {
-          grid-template-columns: 1.2fr 1fr;
+          grid-template-columns: 1fr minmax(0, 720px) 1fr;
+          align-items: start;
+        }
+
+        .result-main {
+          grid-column: 2;
+        }
+
+        .result-details {
+          grid-column: 3;
+          align-self: start;
+          max-width: 320px;
+          margin-left: auto;
         }
       }
 
@@ -425,46 +445,44 @@
               <span class="pill hidden" id="result-confidence"></span>
             </div>
             <div class="result-body">
-              <div class="info-block">
+              <div class="info-block result-main">
+                <h3>Плеер</h3>
+                <div id="player" style="width:100%;aspect-ratio:16/9;background:rgba(0,0,0,0.06);border-radius:12px;overflow:hidden"></div>
+                <div class="form-actions" style="margin-top:10px">
+                  <button id="player-play" type="button" class="secondary">▶️ Play</button>
+                  <button id="player-pause" type="button" class="secondary">⏸ Pause</button>
+                  <label style="margin-left:8px">Громкость <input id="player-volume" type="range" min="0" max="100" value="70" style="vertical-align:middle"/></label>
+                </div>
+                <div class="form-actions" style="margin-top:6px">
+                  <label>Провайдер
+                    <select id="provider-select" style="margin-left:8px"></select>
+                  </label>
+                  <button id="provider-open" type="button" class="secondary">🔗 Открыть</button>
+                </div>
+                <p class="status" id="player-status">Совет: нажмите Play один раз, чтобы разрешить автоплеи.</p>
+                <div class="player-log-controls">
+                  <span class="player-log-title">Журнал плеера</span>
+                  <button id="player-log-clear" type="button" class="secondary small">Очистить</button>
+                </div>
+                <div id="player-log" class="player-log" aria-live="polite"></div>
+              </div>
+              <div class="info-block result-main">
+                <h3>Поисковый запрос</h3>
+                <p id="result-query" class="status"></p>
+              </div>
+              <div class="info-block result-main">
+                <h3>Плейлисты</h3>
+                <ul class="playlist-list" id="playlist-list"></ul>
+              </div>
+              <div class="info-block result-main">
+                <h3>Антидребезг</h3>
+                <ul class="info-list" id="hysteresis-list"></ul>
+              </div>
+              <div class="info-block result-details">
                 <h3>Детали сцены</h3>
                 <ul class="info-list" id="scene-config"></ul>
                 <div id="result-tags" class="status hidden"></div>
                 <div id="result-reason" class="status hidden"></div>
-              </div>
-              <div>
-                <div class="info-block">
-                  <h3>Плеер</h3>
-                  <div id="player" style="width:100%;aspect-ratio:16/9;background:rgba(0,0,0,0.06);border-radius:12px;overflow:hidden"></div>
-                  <div class="form-actions" style="margin-top:10px">
-                    <button id="player-play" type="button" class="secondary">▶️ Play</button>
-                    <button id="player-pause" type="button" class="secondary">⏸ Pause</button>
-                    <label style="margin-left:8px">Громкость <input id="player-volume" type="range" min="0" max="100" value="70" style="vertical-align:middle"/></label>
-                  </div>
-                  <div class="form-actions" style="margin-top:6px">
-                    <label>Провайдер
-                      <select id="provider-select" style="margin-left:8px"></select>
-                    </label>
-                    <button id="provider-open" type="button" class="secondary">🔗 Открыть</button>
-                  </div>
-                  <p class="status" id="player-status">Совет: нажмите Play один раз, чтобы разрешить автоплеи.</p>
-                  <div class="player-log-controls">
-                    <span class="player-log-title">Журнал плеера</span>
-                    <button id="player-log-clear" type="button" class="secondary small">Очистить</button>
-                  </div>
-                  <div id="player-log" class="player-log" aria-live="polite"></div>
-                </div>
-                <div class="info-block">
-                  <h3>Поисковый запрос</h3>
-                  <p id="result-query" class="status"></p>
-                </div>
-                <div class="info-block">
-                  <h3>Плейлисты</h3>
-                  <ul class="playlist-list" id="playlist-list"></ul>
-                </div>
-                <div class="info-block">
-                  <h3>Антидребезг</h3>
-                  <ul class="info-list" id="hysteresis-list"></ul>
-                </div>
               </div>
             </div>
           </div>
