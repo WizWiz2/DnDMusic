@@ -1032,16 +1032,36 @@
       function createOrGetPlayer() {
         if (ytPlayer) return ytPlayer;
         ytPlayerReady = false;
+        const playerVars = {
+          autoplay: 0,
+          playsinline: 1,
+          rel: 0,
+          enablejsapi: 1,
+        };
+
+        try {
+          const { origin, host, protocol } = window.location || {};
+          if (typeof origin === 'string' && origin.toLowerCase().startsWith('https://')) {
+            playerVars.origin = origin;
+          } else if (typeof host === 'string' && host) {
+            const normalized = `https://${host}`;
+            playerVars.origin = normalized;
+            console.warn('[YouTubePlayer] Synthesised HTTPS origin hint for insecure context', {
+              originalOrigin: origin,
+              protocol,
+              appliedOrigin: normalized,
+            });
+          } else if (origin) {
+            console.warn('[YouTubePlayer] Unable to derive HTTPS origin hint', { origin, host, protocol });
+          }
+        } catch (error) {
+          console.warn('[YouTubePlayer] Unable to determine window origin', error);
+        }
+
         ytPlayer = new YT.Player('player', {
           height: '390',
           width: '640',
-          playerVars: {
-            autoplay: 0,
-            playsinline: 1,
-            rel: 0,
-            enablejsapi: 1,
-            origin: location.origin,
-          },
+          playerVars,
           events: {
             onReady: () => {
               try { ytPlayer.setVolume(lastSetVolume); } catch {}
