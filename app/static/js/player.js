@@ -8,6 +8,7 @@ let isUserGestureUnlocked = false;
 let isFading = false;
 let consecutivePlaybackErrors = 0;
 let lastQuery = null;
+let lastSearchResult = null;
 let lastMeta = null;
 let lastPlaylistRequest = null;
 let shouldLoadWhenReady = false;
@@ -301,18 +302,61 @@ function performPlaylistLoad(player, request) {
   if (!player || !request) {
     return;
   }
-  const { query, desiredVol, crossfadeSec } = request;
+  const normalizedRequest = {
+    query: typeof request.query === 'string' ? request.query : '',
+    desiredVol: Number(request.desiredVol ?? lastSetVolume),
+    crossfadeSec: Number(request.crossfadeSec ?? 3),
+    playlistId:
+      typeof request.playlistId === 'string' && request.playlistId.trim().length
+        ? request.playlistId.trim()
+        : '',
+    manualVideoIds: Array.isArray(request.manualVideoIds)
+      ? request.manualVideoIds
+          .map((id) => String(id || '').trim())
+          .filter((id) => id.length > 0)
+      : [],
+  };
+
+  const { query, desiredVol, crossfadeSec, playlistId, manualVideoIds } = normalizedRequest;
+  const hasManualList = manualVideoIds.length > 0;
+  const hasPlaylistId = playlistId.length > 0;
 
   consecutivePlaybackErrors = 0;
-  if (query) {
+  if (hasManualList) {
+    setPlayerStatus(`Запускаем вручную подобранный плейлист (${manualVideoIds.length} видео).`, 'info');
+  } else if (hasPlaylistId) {
+    setPlayerStatus(`Загружаем указанный плейлист: ${playlistId}`, 'info');
+  } else if (query) {
     setPlayerStatus(`Загружаем музыку по запросу: ${query}`, 'info');
+  } else {
+    setPlayerStatus('Загружаем музыку…', 'info');
   }
 
   const doPlay = () => {
     try {
-      appendPlayerLog(`Запрос к YouTube: loadPlaylist → ${query}`, 'debug');
-      player.loadPlaylist({ listType: 'search', list: query, index: 0 });
-      console.log('[performPlaylistLoad] loadPlaylist invoked', { query });
+      if (hasManualList) {
+        appendPlayerLog(
+          `Запрос к YouTube: loadPlaylist → ручной список (${manualVideoIds.length} видео)`,
+          'debug',
+        );
+        player.loadPlaylist(manualVideoIds, 0, 0);
+        console.log('[performPlaylistLoad] loadPlaylist invoked (manual list)', {
+          manualVideoIds,
+        });
+      } else if (hasPlaylistId) {
+        appendPlayerLog(
+          `Запрос к YouTube: loadPlaylist → playlist ${playlistId}`,
+          'debug',
+        );
+        player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0 });
+        console.log('[performPlaylistLoad] loadPlaylist invoked (playlist)', {
+          playlistId,
+        });
+      } else {
+        appendPlayerLog(`Запрос к YouTube: loadPlaylist → ${query}`, 'debug');
+        player.loadPlaylist({ listType: 'search', list: query, index: 0 });
+        console.log('[performPlaylistLoad] loadPlaylist invoked (search)', { query });
+      }
       setTimeout(() => {
         try {
           console.log('[performPlaylistLoad] setTimeout fired after loadPlaylist', { isUserGestureUnlocked });
@@ -327,7 +371,10 @@ function performPlaylistLoad(player, request) {
         }
       }, 200);
       setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
-      console.log('[performPlaylistLoad] Volume ramp requested', { desiredVol, crossfadeSec });
+      console.log('[performPlaylistLoad] Volume ramp requested', {
+        desiredVol,
+        crossfadeSec,
+      });
     } catch (error) {
       console.error('performPlaylistLoad#doPlay', error);
     }
@@ -338,7 +385,13 @@ function performPlaylistLoad(player, request) {
   const isActive = YTState && (state === YTState.PLAYING || state === YTState.BUFFERING);
 
   console.log('[performPlaylistLoad] Entry', {
-    request: { query, desiredVol, crossfadeSec },
+    request: {
+      query,
+      desiredVol,
+      crossfadeSec,
+      playlistId,
+      manualVideoIds,
+    },
     state,
     isUserGestureUnlocked,
     isActive,
@@ -370,22 +423,64 @@ function performPlaylistLoad(player, request) {
     doPlay();
   }
 
-  lastPlaylistRequest = request;
+  lastPlaylistRequest = normalizedRequest;
 }
 
-export function playSearchOnYouTube(query, meta) {
+export function playSearchOnYouTube(result, meta) {
+  const normalizeVideoIds = (value) => {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value
+      .map((id) => String(id || '').trim())
+      .filter((id) => id.length > 0);
+  };
+
+  const pickFirstString = (...values) => {
+    for (const value of values) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed.length > 0) {
+          return trimmed;
+        }
+      }
+    }
+    return null;
+  };
+
+  const payload =
+    typeof result === 'string'
+      ? { query: result }
+      : result && typeof result === 'object'
+      ? { ...result }
+      : { query: '' };
+
+  const query = typeof payload.query === 'string' ? payload.query : '';
+  const manualFromResult = normalizeVideoIds(payload.youtube_video_ids);
+  const manualFromMeta = normalizeVideoIds(meta?.youtube_video_ids);
+  const manualVideoIds = manualFromResult.length ? manualFromResult : manualFromMeta;
+  const playlistId = pickFirstString(payload.youtube_playlist_id, meta?.youtube_playlist_id);
+
+  lastSearchResult = {
+    query,
+    youtube_playlist_id: playlistId,
+    youtube_video_ids: manualVideoIds.slice(),
+  };
+  lastQuery =
+    query ||
+    (playlistId ? `playlist:${playlistId}` : manualVideoIds.length ? 'manual_playlist' : '');
+  lastMeta = meta || null;
+
   ensureYouTubeApiLoaded(() => {
     const player = createOrGetPlayer();
     const desiredVol = Number(meta?.volume ?? dom.playerVolumeInput?.value ?? 70);
     const crossfadeSec = Number(meta?.crossfade ?? 3);
-    const normalizedQuery = String(query || '');
-    lastQuery = normalizedQuery;
-    lastMeta = meta || null;
-
     const request = {
-      query: normalizedQuery,
+      query,
       desiredVol,
       crossfadeSec,
+      playlistId,
+      manualVideoIds,
     };
     lastPlaylistRequest = request;
 
@@ -435,9 +530,9 @@ export function bindPlayerControls() {
           console.warn('[PlayerControls] Unable to unmute player', error);
         }
         isUserGestureUnlocked = true;
-        if (lastQuery) {
+        if (lastSearchResult) {
           try {
-            playSearchOnYouTube(lastQuery, lastMeta);
+            playSearchOnYouTube(lastSearchResult, lastMeta);
           } catch (error) {
             console.error('[PlayerControls] Unable to resume last query', error);
           }

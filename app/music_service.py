@@ -65,6 +65,8 @@ class MusicService:
             query=scene_config.query,
             playlists=playlists,
             hysteresis=self._config.hysteresis,
+            youtube_playlist_id=scene_config.youtube_playlist_id,
+            youtube_video_ids=scene_config.youtube_video_ids,
         )
         self._cache.set(cache_key, result)
         return result
@@ -117,6 +119,8 @@ class MusicService:
                         "crossfade": scene_config.crossfade,
                         "cooldown_sec": scene_config.cooldown_sec,
                         "providers": providers,
+                        "youtube_playlist_id": scene_config.youtube_playlist_id,
+                        "youtube_video_ids": scene_config.youtube_video_ids,
                     }
                 )
             library[genre] = sorted(entries, key=lambda item: item["name"])
@@ -173,6 +177,8 @@ class MusicService:
             query=query,
             playlists=playlists,
             hysteresis=base_result.hysteresis,
+            youtube_playlist_id=base_result.youtube_playlist_id,
+            youtube_video_ids=base_result.youtube_video_ids,
             tags=normalized_tags,
             confidence=prediction.confidence,
             reason=prediction.reason,

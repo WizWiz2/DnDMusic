@@ -52,6 +52,15 @@ class SceneConfig(BaseModel):
     providers: List[PlaylistProviderConfig] = Field(
         default_factory=list, description="Список провайдеров плейлистов"
     )
+    youtube_playlist_id: Optional[str] = Field(
+        None,
+        description="Идентификатор YouTube-плейлиста для прямой загрузки",
+    )
+    youtube_video_ids: Optional[List[str]] = Field(
+        default=None,
+        min_length=1,
+        description="Ручной список видеороликов YouTube для воспроизведения",
+    )
 
 
 class DynamicSceneConfig(BaseModel):
@@ -120,6 +129,8 @@ class SearchResult(BaseModel):
     query: str
     playlists: List[PlaylistSearch]
     hysteresis: HysteresisConfig
+    youtube_playlist_id: Optional[str] = None
+    youtube_video_ids: Optional[List[str]] = None
 
 
 class RecommendationRequest(BaseModel):
