@@ -51,6 +51,31 @@ class PlayerErrorReport(BaseModel):
         alias="reportedAt",
         description="Client-side timestamp (ISO-8601) for when the error happened",
     )
+    manual_list_active: Optional[bool] = Field(
+        None,
+        alias="manualListActive",
+        description="Whether a manual override playlist was in use",
+    )
+    manual_list_initial_length: Optional[int] = Field(
+        None,
+        alias="manualListInitialLength",
+        description="Size of the manual playlist before error handling",
+    )
+    manual_list_remaining_length: Optional[int] = Field(
+        None,
+        alias="manualListRemainingLength",
+        description="Size of the manual playlist after removing failing entries",
+    )
+    manual_list_was_trimmed: Optional[bool] = Field(
+        None,
+        alias="manualListWasTrimmed",
+        description="Indicates whether an entry was removed from the manual list",
+    )
+    removed_manual_video_id: Optional[str] = Field(
+        None,
+        alias="removedManualVideoId",
+        description="Identifier of the manual override entry that was dropped",
+    )
 
 
 class PlayerErrorService:

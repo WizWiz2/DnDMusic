@@ -280,6 +280,91 @@ function createOrGetPlayer() {
         const videoTitle = videoData?.title ? ` — ${videoData.title}` : '';
         const playlistItems = Array.isArray(playlist) ? playlist.length : 0;
         const hasValidIndex = typeof playlistIndex === 'number' && playlistIndex >= 0;
+        const manualList = Array.isArray(lastPlaylistRequest?.manualVideoIds)
+          ? lastPlaylistRequest.manualVideoIds
+              .map((id) => String(id || '').trim())
+              .filter((id) => id.length > 0)
+          : [];
+        const manualListInitialLength = manualList.length;
+        let manualListRemainingLength = manualList.length;
+        let manualListWasTrimmed = false;
+        let removedManualVideoId = null;
+        const manualListActive = manualList.length > 0;
+
+        if (manualListActive) {
+          let removalIndex = -1;
+          if (typeof videoId === 'string' && videoId.trim().length) {
+            removalIndex = manualList.findIndex((id) => id === videoId);
+          }
+          if (removalIndex < 0 && hasValidIndex && playlistIndex < manualList.length) {
+            removalIndex = playlistIndex;
+          }
+
+          if (removalIndex < 0 && manualList.length > 0) {
+            console.warn('[YouTubePlayer] Unable to match failing manual video, removing the first entry', {
+              playlistIndex,
+              manualList,
+            });
+            removalIndex = 0;
+          }
+
+          if (removalIndex >= 0 && removalIndex < manualList.length) {
+            const failedVideoId = manualList.splice(removalIndex, 1)[0];
+            console.warn('[YouTubePlayer] Removing failed manual video from playlist', {
+              failedVideoId,
+              removalIndex,
+              remaining: manualList,
+            });
+
+            manualListWasTrimmed = true;
+            removedManualVideoId = failedVideoId;
+            manualListRemainingLength = manualList.length;
+
+            if (lastPlaylistRequest) {
+              lastPlaylistRequest = {
+                ...lastPlaylistRequest,
+                manualVideoIds: manualList.slice(),
+              };
+            }
+            if (lastSearchResult && Array.isArray(lastSearchResult.youtube_video_ids)) {
+              lastSearchResult = {
+                ...lastSearchResult,
+                youtube_video_ids: manualList.slice(),
+              };
+            }
+
+            if (manualList.length > 0) {
+              setPlayerStatus(
+                `Видео недоступно (ошибка ${errorCode}${videoTitle}). Пропускаю ${failedVideoId} и пробую следующий ролик…`,
+                'warn',
+              );
+              setTimeout(() => {
+                try {
+                  performPlaylistLoad(ytPlayer, lastPlaylistRequest);
+                } catch (error) {
+                  console.error('Не удалось перезапустить ручной плейлист', error);
+                }
+              }, 360);
+              return;
+            }
+
+            setPlayerStatus(
+              `Видео недоступно (ошибка ${errorCode}${videoTitle}). Ручной список закончился, пробую резервный источник…`,
+              'warn',
+            );
+            setTimeout(() => {
+              try {
+                performPlaylistLoad(ytPlayer, lastPlaylistRequest);
+              } catch (error) {
+                console.error('Не удалось перейти к резервному источнику после исчерпания ручного списка', error);
+              }
+            }, 360);
+            return;
+          }
+        }
+
+        manualListRemainingLength = manualList.length;
+
         const shouldRetrySearch =
           !hasValidIndex && playlistItems === 0 && lastPlaylistRequest && consecutivePlaybackErrors <= 4;
 
@@ -306,6 +391,11 @@ function createOrGetPlayer() {
           playlistLength: playlistItems,
           consecutivePlaybackErrors,
           reportedAt: new Date().toISOString(),
+          manualListActive,
+          manualListInitialLength: manualListActive ? manualListInitialLength : null,
+          manualListRemainingLength: manualListActive ? manualListRemainingLength : null,
+          manualListWasTrimmed: manualListActive ? manualListWasTrimmed : null,
+          removedManualVideoId,
         };
         sendPlayerErrorReport(report);
 
