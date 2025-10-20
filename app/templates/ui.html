@@ -1367,8 +1367,33 @@
           const payload = await response.clone().json();
           if (payload && typeof payload === "object") {
             const detail = payload.detail || payload.message || payload.error;
-            if (detail) {
-              return String(detail);
+            if (typeof detail === "string") {
+              return detail;
+            }
+            if (Array.isArray(detail)) {
+              const messages = detail
+                .map((item) => {
+                  if (!item) {
+                    return null;
+                  }
+                  if (typeof item === "string") {
+                    return item;
+                  }
+                  if (typeof item === "object") {
+                    return item.msg || item.message || item.detail || null;
+                  }
+                  return null;
+                })
+                .filter(Boolean);
+              if (messages.length) {
+                return messages.join(". ");
+              }
+            }
+            if (detail && typeof detail === "object") {
+              const nested = detail.message || detail.msg || detail.detail;
+              if (nested) {
+                return nested;
+              }
             }
           }
         } catch (error) {
@@ -1393,20 +1418,31 @@
       }
 
       async function runSearch(sceneOverride) {
-        if (!state.genre) {
+        const currentGenre = (state.genre || genreSelect.value || "").trim();
+        if (!currentGenre) {
           searchStatus.textContent = "Сначала выберите жанр.";
           return;
         }
-        const scene = sceneOverride || sceneSelect.value;
-        if (!scene) {
+
+        const currentScene = (sceneOverride ?? state.scene ?? sceneSelect.value ?? "").trim();
+        if (!currentScene) {
           searchStatus.textContent = "Для жанра нет сцен.";
           return;
+        }
+
+        state.genre = currentGenre;
+        state.scene = currentScene;
+        if (genreSelect.value !== currentGenre) {
+          genreSelect.value = currentGenre;
+        }
+        if (sceneSelect.value !== currentScene) {
+          sceneSelect.value = currentScene;
         }
 
         searchStatus.textContent = "Загружаем варианты…";
         searchButton.disabled = true;
         try {
-          const params = new URLSearchParams({ genre: state.genre, scene });
+          const params = new URLSearchParams({ genre: state.genre, scene: state.scene });
           const response = await fetch(`/api/search?${params.toString()}`);
           if (!response.ok) {
             const message = await extractErrorMessage(
