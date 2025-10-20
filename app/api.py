@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from .config import load_config
 from .models import (
@@ -27,6 +28,9 @@ from .ai_client import NeuralTaggerClient
 
 
 app = FastAPI(title="DnD Music Tool", version="0.1.0")
+
+_STATIC_DIR = Path(__file__).with_name("static")
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 _UI_TEMPLATE_PLACEHOLDER = "{{ initial_data | tojson | safe }}"
 
