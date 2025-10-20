@@ -51,6 +51,12 @@ export function renderSceneConfig(meta) {
   if (meta.providers && meta.providers.length) {
     fields.push(['Провайдеры', meta.providers.map((p) => p.name).join(', ')]);
   }
+  if (typeof meta.youtube_playlist_id === 'string' && meta.youtube_playlist_id.trim().length) {
+    fields.push(['YouTube плейлист', meta.youtube_playlist_id.trim()]);
+  }
+  if (Array.isArray(meta.youtube_video_ids) && meta.youtube_video_ids.length) {
+    fields.push(['Ручной список видео', `${meta.youtube_video_ids.length} шт.`]);
+  }
 
   if (!fields.length) {
     const li = document.createElement('li');
@@ -142,11 +148,18 @@ export function showResult(result, meta, type) {
   renderPlaylists(result.playlists || []);
   renderHysteresis(result.hysteresis || {});
 
-  if (result.query) {
-    playSearchOnYouTube(result.query, meta);
-    if (meta && meta.volume !== undefined && meta.volume !== null) {
-      applyMetaVolume(meta.volume);
-    }
+  const manualList = Array.isArray(result?.youtube_video_ids)
+    ? result.youtube_video_ids.filter((id) => typeof id === 'string' && id.trim())
+    : [];
+  const hasPlaylistId = typeof result?.youtube_playlist_id === 'string' && result.youtube_playlist_id.trim().length > 0;
+  const hasQuery = typeof result?.query === 'string' && result.query.trim().length > 0;
+
+  if (manualList.length || hasPlaylistId || hasQuery) {
+    playSearchOnYouTube(result, meta);
+  }
+
+  if (meta && meta.volume !== undefined && meta.volume !== null) {
+    applyMetaVolume(meta.volume);
   }
 
   if (Array.isArray(result.tags) && tagsRow) {
