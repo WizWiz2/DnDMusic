@@ -15,6 +15,50 @@ let youtubeApiRequested = false;
 let youtubeApiReady = false;
 const youtubeApiQueue = [];
 let youtubeApiPollerActive = false;
+const PLAYER_ERROR_ENDPOINT = '/api/player-errors';
+const ERROR_REPORT_THROTTLE_MS = 8000;
+let lastErrorReportSentAt = 0;
+let lastErrorReportSignature = null;
+
+function sendPlayerErrorReport(report) {
+  const signatureParts = [
+    report.errorCode,
+    report.videoId || 'none',
+    report.request?.query || 'no-query',
+  ];
+  const signature = signatureParts.join('|');
+  const now = Date.now();
+  if (signature === lastErrorReportSignature && now - lastErrorReportSentAt < ERROR_REPORT_THROTTLE_MS) {
+    console.debug('[PlayerErrorReporting] Skip duplicate report', { signature, report });
+    return;
+  }
+
+  lastErrorReportSignature = signature;
+  lastErrorReportSentAt = now;
+
+  const payload = JSON.stringify(report);
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([payload], { type: 'application/json' });
+      const accepted = navigator.sendBeacon(PLAYER_ERROR_ENDPOINT, blob);
+      if (!accepted) {
+        throw new Error('sendBeacon returned false');
+      }
+      return;
+    }
+  } catch (error) {
+    console.debug('[PlayerErrorReporting] Falling back to fetch', error);
+  }
+
+  fetch(PLAYER_ERROR_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload,
+    keepalive: true,
+  }).catch((error) => {
+    console.warn('[PlayerErrorReporting] Unable to submit error report', error);
+  });
+}
 
 function setPlayerStatus(message, level = 'info') {
   appendPlayerLog(message, level);
@@ -213,6 +257,7 @@ function createOrGetPlayer() {
         const playlistIndex = ytPlayer?.getPlaylistIndex?.();
         const playlist = ytPlayer?.getPlaylist?.();
         const videoData = ytPlayer?.getVideoData?.();
+        const videoId = videoData?.video_id ?? videoData?.videoId ?? null;
         const logLabel = 'YouTube playback error';
         const errorContext = {
           errorCode,
@@ -236,6 +281,32 @@ function createOrGetPlayer() {
         const hasValidIndex = typeof playlistIndex === 'number' && playlistIndex >= 0;
         const shouldRetrySearch =
           !hasValidIndex && playlistItems === 0 && lastPlaylistRequest && consecutivePlaybackErrors <= 4;
+
+        const sanitizedRequest = lastPlaylistRequest
+          ? (() => {
+              const desiredVolNumber = Number(lastPlaylistRequest.desiredVol);
+              const crossfadeNumber = Number(lastPlaylistRequest.crossfadeSec);
+              return {
+                query: String(lastPlaylistRequest.query ?? ''),
+                desiredVol: Number.isFinite(desiredVolNumber) ? desiredVolNumber : null,
+                crossfadeSec: Number.isFinite(crossfadeNumber) ? crossfadeNumber : null,
+              };
+            })()
+          : null;
+        const report = {
+          errorCode,
+          videoId,
+          request: sanitizedRequest,
+          lastQuery,
+          playlistIndex:
+            typeof playlistIndex === 'number' && Number.isFinite(playlistIndex)
+              ? Math.trunc(playlistIndex)
+              : null,
+          playlistLength: playlistItems,
+          consecutivePlaybackErrors,
+          reportedAt: new Date().toISOString(),
+        };
+        sendPlayerErrorReport(report);
 
         if (shouldRetrySearch) {
           setPlayerStatus(`Видео недоступно (ошибка ${errorCode}${videoTitle}), повторяю поиск…`, 'warn');

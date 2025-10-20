@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .config import load_config
+from .player_errors import PlayerErrorReport, PlayerErrorService
 from .models import (
     HealthStatus,
     MusicConfig,
@@ -88,6 +89,11 @@ def get_service() -> MusicService:
     return get_service_cached()
 
 
+@lru_cache(maxsize=1)
+def get_player_error_service() -> PlayerErrorService:
+    return PlayerErrorService()
+
+
 def _build_ui_response(service: MusicService) -> HTMLResponse:
     genres = list(service.available_genres())
     scene_library = service.describe_scenes()
@@ -153,3 +159,14 @@ async def recommend(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RecommendationUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@app.post("/api/player-errors", status_code=202)
+async def report_player_error(
+    report: PlayerErrorReport,
+    service: PlayerErrorService = Depends(get_player_error_service),
+) -> dict:
+    """Receive YouTube playback errors reported by the UI."""
+
+    service.log(report)
+    return {"status": "accepted"}
