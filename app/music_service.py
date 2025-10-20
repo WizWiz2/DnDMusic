@@ -12,6 +12,7 @@ from .models import (
     SearchResult,
 )
 from .ai_client import NeuralTaggerClient, NeuralTaggerError, ScenePrediction
+from .youtube_search import YouTubeSearchClient, YouTubeSearchError
 
 
 class MusicServiceError(Exception):
@@ -34,11 +35,16 @@ class MusicService:
     """Entry point for search logic."""
 
     def __init__(
-        self, config: MusicConfig, *, ai_client: NeuralTaggerClient | None = None
+        self,
+        config: MusicConfig,
+        *,
+        ai_client: NeuralTaggerClient | None = None,
+        youtube_client: YouTubeSearchClient | None = None,
     ) -> None:
         self._config = config
         self._cache = TTLCache[Tuple[str, str], SearchResult](config.hysteresis.cache_ttl_sec)
         self._ai_client = ai_client
+        self._youtube_client = youtube_client
 
     def _get_scene_config(self, genre: str, scene: str) -> SceneConfig:
         try:
@@ -58,6 +64,7 @@ class MusicService:
         scene_config = self._get_scene_config(genre, scene)
 
         playlists = [provider.build_search(scene_config.query) for provider in scene_config.providers]
+        video_ids = self._fetch_video_ids(scene_config.query)
 
         result = SearchResult(
             genre=cache_key[0],
@@ -65,6 +72,7 @@ class MusicService:
             query=scene_config.query,
             playlists=playlists,
             hysteresis=self._config.hysteresis,
+            video_ids=video_ids,
         )
         self._cache.set(cache_key, result)
         return result
@@ -143,6 +151,7 @@ class MusicService:
             scene_slug = base_result.scene
             query = base_result.query
             playlists = base_result.playlists
+            video_ids = base_result.video_ids
         else:
             fallback = self._config.get_dynamic_defaults(genre)
             if fallback is None:
@@ -158,12 +167,14 @@ class MusicService:
                 provider.build_search(prediction.scene)
                 for provider in fallback.providers
             ]
+            video_ids = self._fetch_video_ids(prediction.scene)
             base_result = SearchResult(
                 genre=genre.lower(),
                 scene=scene_slug,
                 query=prediction.scene,
                 playlists=playlists,
                 hysteresis=self._config.hysteresis,
+                video_ids=video_ids,
             )
             query = prediction.scene
 
@@ -176,7 +187,22 @@ class MusicService:
             tags=normalized_tags,
             confidence=prediction.confidence,
             reason=prediction.reason,
+            video_ids=video_ids,
         )
+
+    def _fetch_video_ids(self, query: str) -> List[str]:
+        if not query or not self._youtube_client:
+            return []
+
+        try:
+            candidates = self._youtube_client.search_videos(query)
+            if not candidates:
+                return []
+            filtered = self._youtube_client.filter_playable(candidates)
+        except (YouTubeSearchError, ValueError):
+            return []
+
+        return filtered
 
     def _call_ai(
         self, genre: str, tags: Iterable[str]

@@ -9,6 +9,7 @@ let isFading = false;
 let consecutivePlaybackErrors = 0;
 let lastQuery = null;
 let lastMeta = null;
+let lastVideoIds = [];
 let lastPlaylistRequest = null;
 let shouldLoadWhenReady = false;
 let youtubeApiRequested = false;
@@ -301,22 +302,43 @@ function performPlaylistLoad(player, request) {
   if (!player || !request) {
     return;
   }
-  const { query, desiredVol, crossfadeSec } = request;
+  const {
+    query,
+    videoIds = [],
+    desiredVol,
+    crossfadeSec,
+  } = request;
+
+  const playlistIds = Array.isArray(videoIds) ? videoIds.filter((id) => typeof id === 'string' && id.trim().length > 0) : [];
+  const hasVideoIds = playlistIds.length > 0;
+
+  if (!hasVideoIds && !query) {
+    setPlayerStatus('Нет данных для загрузки плейлиста.', 'warn');
+    return;
+  }
 
   consecutivePlaybackErrors = 0;
-  if (query) {
+  if (hasVideoIds) {
+    setPlayerStatus('Загружаем готовую подборку треков…', 'info');
+  } else if (query) {
     setPlayerStatus(`Загружаем музыку по запросу: ${query}`, 'info');
   }
 
   const doPlay = () => {
     try {
-      appendPlayerLog(`Запрос к YouTube: loadPlaylist → ${query}`, 'debug');
-      player.loadPlaylist({ listType: 'search', list: query, index: 0 });
-      console.log('[performPlaylistLoad] loadPlaylist invoked', { query });
+      const logTarget = hasVideoIds ? `ids:${playlistIds.join(',')}` : query;
+      appendPlayerLog(`Запрос к YouTube: loadPlaylist → ${logTarget}`, 'debug');
+      if (hasVideoIds) {
+        player.loadPlaylist(playlistIds, 0, 0);
+        console.log('[performPlaylistLoad] loadPlaylist invoked with IDs', { playlistIds });
+      } else {
+        player.loadPlaylist({ listType: 'search', list: query, index: 0 });
+        console.log('[performPlaylistLoad] loadPlaylist invoked with search', { query });
+      }
       setTimeout(() => {
         try {
           console.log('[performPlaylistLoad] setTimeout fired after loadPlaylist', { isUserGestureUnlocked });
-          if (isUserGestureUnlocked) {
+          if (isUserGestureUnlocked && typeof player.playVideo === 'function') {
             player.playVideo();
             console.log('[performPlaylistLoad] playVideo invoked from timeout');
           } else {
@@ -338,7 +360,7 @@ function performPlaylistLoad(player, request) {
   const isActive = YTState && (state === YTState.PLAYING || state === YTState.BUFFERING);
 
   console.log('[performPlaylistLoad] Entry', {
-    request: { query, desiredVol, crossfadeSec },
+    request: { query, videoIds: playlistIds, desiredVol, crossfadeSec },
     state,
     isUserGestureUnlocked,
     isActive,
@@ -370,20 +392,30 @@ function performPlaylistLoad(player, request) {
     doPlay();
   }
 
-  lastPlaylistRequest = request;
+  lastPlaylistRequest = {
+    query,
+    videoIds: playlistIds,
+    desiredVol,
+    crossfadeSec,
+  };
 }
 
-export function playSearchOnYouTube(query, meta) {
+export function playSearchOnYouTube(query, videoIds, meta) {
   ensureYouTubeApiLoaded(() => {
     const player = createOrGetPlayer();
     const desiredVol = Number(meta?.volume ?? dom.playerVolumeInput?.value ?? 70);
     const crossfadeSec = Number(meta?.crossfade ?? 3);
-    const normalizedQuery = String(query || '');
+    const normalizedQuery = typeof query === 'string' ? query : String(query || '');
+    const normalizedIds = Array.isArray(videoIds)
+      ? videoIds.filter((id) => typeof id === 'string' && id.trim().length > 0)
+      : [];
     lastQuery = normalizedQuery;
+    lastVideoIds = normalizedIds;
     lastMeta = meta || null;
 
     const request = {
       query: normalizedQuery,
+      videoIds: normalizedIds,
       desiredVol,
       crossfadeSec,
     };
@@ -437,7 +469,7 @@ export function bindPlayerControls() {
         isUserGestureUnlocked = true;
         if (lastQuery) {
           try {
-            playSearchOnYouTube(lastQuery, lastMeta);
+            playSearchOnYouTube(lastQuery, lastVideoIds, lastMeta);
           } catch (error) {
             console.error('[PlayerControls] Unable to resume last query', error);
           }

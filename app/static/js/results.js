@@ -142,8 +142,9 @@ export function showResult(result, meta, type) {
   renderPlaylists(result.playlists || []);
   renderHysteresis(result.hysteresis || {});
 
-  if (result.query) {
-    playSearchOnYouTube(result.query, meta);
+  const videoIds = Array.isArray(result.video_ids) ? result.video_ids : [];
+  if ((videoIds && videoIds.length) || result.query) {
+    playSearchOnYouTube(result.query, videoIds, meta);
     if (meta && meta.volume !== undefined && meta.volume !== null) {
       applyMetaVolume(meta.volume);
     }

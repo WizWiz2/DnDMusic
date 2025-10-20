@@ -120,6 +120,10 @@ class SearchResult(BaseModel):
     query: str
     playlists: List[PlaylistSearch]
     hysteresis: HysteresisConfig
+    video_ids: List[str] = Field(
+        default_factory=list,
+        description="Предварительно подобранные идентификаторы YouTube-видео",
+    )
 
 
 class RecommendationRequest(BaseModel):
@@ -141,6 +145,10 @@ class RecommendationResult(SearchResult):
     )
     reason: Optional[str] = Field(
         None, description="Текстовое объяснение от модели, если доступно"
+    )
+    video_ids: List[str] = Field(
+        default_factory=list,
+        description="Предварительно подобранные идентификаторы YouTube-видео",
     )
 
 

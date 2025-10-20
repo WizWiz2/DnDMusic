@@ -19,6 +19,14 @@ pip install -e .[dev]
 UVICORN_RELOAD=1 python -m app
 ```
 
+Для прямой интеграции с YouTube задайте ключ Data API (v3) до запуска сервиса:
+
+```bash
+export YOUTUBE_API_KEY="ваш-ключ"
+# Опционально укажите код страны для проверки региональных ограничений
+export YOUTUBE_API_REGION="RU"
+```
+
 По умолчанию используется конфигурация `config/default.yaml`. Чтобы подключить другой файл, задайте переменную окружения `MUSIC_CONFIG_PATH`:
 
 ```bash
@@ -61,6 +69,10 @@ POST /api/recommend
   "genre": "fantasy",
   "scene": "battle",
   "query": "epic fantasy battle instrumental -vocals",
+  "video_ids": [
+    "a1B2c3D4e5F",
+    "x6Y7z8W9v0U"
+  ],
   "playlists": [
     {
       "provider": "youtube_music",
@@ -89,6 +101,8 @@ POST /api/recommend
 - `MUSIC_AI_ENDPOINT` — полный URL эндпоинта нейросетевого сервиса рекомендаций.
 - `MUSIC_AI_TOKEN` — опциональный Bearer-токен для авторизации при обращении к нейросети.
 - `MUSIC_AI_TIMEOUT` — таймаут (в секундах) для обращения к нейросети, по умолчанию 30.
+- `YOUTUBE_API_KEY` — ключ YouTube Data API v3 для подбора конкретных видеороликов.
+- `YOUTUBE_API_REGION` — ISO-код страны (например, `RU`), чтобы учитывать региональные ограничения YouTube.
 
 ## Тесты
 ```bash

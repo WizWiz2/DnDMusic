@@ -10,7 +10,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from .config import load_config
+from .config import load_config, load_youtube_settings
 from .models import (
     HealthStatus,
     MusicConfig,
@@ -25,6 +25,7 @@ from .music_service import (
     SceneNotFoundError,
 )
 from .ai_client import NeuralTaggerClient
+from .youtube_search import YouTubeSearchClient
 
 
 app = FastAPI(title="DnD Music Tool", version="0.1.0")
@@ -80,8 +81,18 @@ def get_ai_client() -> NeuralTaggerClient:
 
 
 @lru_cache(maxsize=1)
+def get_youtube_client() -> YouTubeSearchClient | None:
+    settings = load_youtube_settings()
+    if not settings.api_key:
+        return None
+    return YouTubeSearchClient(settings.api_key, region_code=settings.region_code)
+
+
+@lru_cache(maxsize=1)
 def get_service_cached() -> MusicService:
-    return MusicService(get_config(), ai_client=get_ai_client())
+    return MusicService(
+        get_config(), ai_client=get_ai_client(), youtube_client=get_youtube_client()
+    )
 
 
 def get_service() -> MusicService:
