@@ -128,6 +128,7 @@ export async function runRecommend() {
     }
     const result = await response.json();
     state.genre = result.genre;
+    state.scene = result.scene;
     applyTheme(state.genre);
     if (dom.genreSelect) {
       dom.genreSelect.value = state.genre;
@@ -175,6 +176,7 @@ export async function runAutoRecommend(tags) {
     }
     const result = await response.json();
     state.genre = result.genre;
+    state.scene = result.scene;
     applyTheme(state.genre);
     if (dom.genreSelect) {
       dom.genreSelect.value = state.genre;

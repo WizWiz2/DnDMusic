@@ -18,6 +18,117 @@ function arraysEqual(left, right) {
   return left.every((value, index) => value === right[index]);
 }
 
+function makeJsonResponse(payload, { ok = true, status = 200 } = {}) {
+  return {
+    ok,
+    status,
+    async json() {
+      return payload;
+    },
+    async text() {
+      if (typeof payload === 'string') {
+        return payload;
+      }
+      try {
+        return JSON.stringify(payload);
+      } catch (error) {
+        return '';
+      }
+    },
+    clone() {
+      return makeJsonResponse(payload, { ok, status });
+    },
+  };
+}
+
+class FakeStyle {
+  constructor() {
+    this.properties = new Map();
+  }
+
+  setProperty(name, value) {
+    this.properties.set(name, value);
+  }
+
+  getPropertyValue(name) {
+    return this.properties.get(name) ?? '';
+  }
+}
+
+class FakeClassList {
+  constructor(element) {
+    this.element = element;
+    this.classes = new Set();
+  }
+
+  _sync() {
+    this.element._className = Array.from(this.classes).join(' ');
+  }
+
+  _setFromString(value) {
+    this.classes = new Set(String(value || '').split(/\s+/).filter(Boolean));
+    this._sync();
+  }
+
+  add(...classNames) {
+    classNames.flat().forEach((name) => {
+      if (typeof name === 'string' && name.trim().length) {
+        this.classes.add(name.trim());
+      }
+    });
+    this._sync();
+  }
+
+  remove(...classNames) {
+    classNames.flat().forEach((name) => {
+      if (typeof name === 'string') {
+        this.classes.delete(name.trim());
+      }
+    });
+    this._sync();
+  }
+
+  toggle(className, force) {
+    if (typeof className !== 'string' || !className.trim().length) {
+      return this.classes.has(className);
+    }
+    const normalized = className.trim();
+    if (force === true) {
+      this.classes.add(normalized);
+      this._sync();
+      return true;
+    }
+    if (force === false) {
+      this.classes.delete(normalized);
+      this._sync();
+      return false;
+    }
+    if (this.classes.has(normalized)) {
+      this.classes.delete(normalized);
+      this._sync();
+      return false;
+    }
+    this.classes.add(normalized);
+    this._sync();
+    return true;
+  }
+
+  contains(className) {
+    if (typeof className !== 'string') {
+      return false;
+    }
+    return this.classes.has(className.trim());
+  }
+
+  toString() {
+    return Array.from(this.classes).join(' ');
+  }
+
+  get length() {
+    return this.classes.size;
+  }
+}
+
 class FakeElement {
   constructor(id = null, tagName = 'div') {
     this.id = id;
@@ -27,12 +138,14 @@ class FakeElement {
     this.eventListeners = new Map();
     this._textContent = '';
     this._innerHTML = '';
-    this.className = '';
+    this._className = '';
+    this.classList = new FakeClassList(this);
     this.style = {};
     this.value = '';
     this.scrollTop = 0;
     this.scrollHeight = 0;
     this.parentNode = null;
+    this.ownerDocument = null;
   }
 
   append(child) {
@@ -71,11 +184,22 @@ class FakeElement {
   set innerHTML(value) {
     this._innerHTML = String(value);
     this._textContent = this._innerHTML;
+    this.children.forEach((child) => {
+      child.parentNode = null;
+    });
     this.children = [];
   }
 
   get innerHTML() {
     return this._innerHTML;
+  }
+
+  set className(value) {
+    this.classList._setFromString(value);
+  }
+
+  get className() {
+    return this._className;
   }
 
   addEventListener(type, handler) {
@@ -101,10 +225,15 @@ class FakeDocument {
   constructor() {
     this.elements = new Map();
     this.head = new FakeElement('head', 'head');
+    this.head.ownerDocument = this;
+    this.documentElement = new FakeElement('html', 'html');
+    this.documentElement.ownerDocument = this;
+    this.documentElement.style = new FakeStyle();
   }
 
   registerElement(id, element = new FakeElement(id)) {
     element.id = id;
+    element.ownerDocument = this;
     this.elements.set(id, element);
     return element;
   }
@@ -114,7 +243,9 @@ class FakeDocument {
   }
 
   createElement(tagName) {
-    return new FakeElement(null, tagName);
+    const element = new FakeElement(null, tagName);
+    element.ownerDocument = this;
+    return element;
   }
 
   querySelector(selector) {
@@ -124,6 +255,34 @@ class FakeDocument {
     }
     const src = match[1];
     return this.head.children.find((child) => child.src === src) || null;
+  }
+
+  querySelectorAll(selector) {
+    if (typeof selector !== 'string' || !selector.startsWith('.')) {
+      return [];
+    }
+    const className = selector.slice(1).trim();
+    if (!className.length) {
+      return [];
+    }
+    const results = [];
+    const visited = new Set();
+    const visit = (element) => {
+      if (!element || visited.has(element)) {
+        return;
+      }
+      visited.add(element);
+      if (element.classList?.contains(className)) {
+        results.push(element);
+      }
+      element.children.forEach((child) => visit(child));
+    };
+    visit(this.documentElement);
+    visit(this.head);
+    for (const element of this.elements.values()) {
+      visit(element);
+    }
+    return results;
   }
 }
 
@@ -177,7 +336,15 @@ function setupEnvironment() {
     document.registerElement(id);
   }
   const initialData = document.getElementById('initial-data');
-  initialData.textContent = JSON.stringify({ genres: ['test'], scenes: [] });
+  initialData.textContent = JSON.stringify({
+    genres: ['test'],
+    scenes: {
+      test: [
+        { id: 'battle', name: 'Battle' },
+        { id: 'camp', name: 'Camp' },
+      ],
+    },
+  });
   const playerVolume = document.getElementById('player-volume');
   playerVolume.value = '70';
 
@@ -192,6 +359,7 @@ function setupEnvironment() {
 
   const beaconCalls = [];
   const fetchCalls = [];
+  const fetchResponses = [];
 
   const navigatorObject = {
     sendBeacon(url, blob) {
@@ -211,7 +379,17 @@ function setupEnvironment() {
   windowObject.navigator = navigatorObject;
   windowObject.fetch = (url, options = {}) => {
     fetchCalls.push({ url, options });
-    return Promise.resolve({ ok: true });
+    let next = fetchResponses.length ? fetchResponses.shift() : null;
+    if (typeof next === 'function') {
+      next = next(url, options);
+    }
+    if (!next) {
+      next = makeJsonResponse({});
+    }
+    return Promise.resolve(next);
+  };
+  windowObject.queueFetchResponse = (response) => {
+    fetchResponses.push(response);
   };
   windowObject.performance = { now: () => Date.now() };
   windowObject.setTimeout = setTimeout;
@@ -227,7 +405,7 @@ function setupEnvironment() {
   globalThis.fetch = windowObject.fetch;
   document.defaultView = windowObject;
 
-  return { document, beaconCalls, fetchCalls };
+  return { document, beaconCalls, fetchCalls, queueFetchResponse: windowObject.queueFetchResponse };
 }
 
 class FakeYTPlayer {
@@ -338,7 +516,7 @@ FakeYTPlayer.PlayerState = {
   CUED: 5,
 };
 
-const { beaconCalls, fetchCalls } = setupEnvironment();
+const { beaconCalls, fetchCalls, queueFetchResponse } = setupEnvironment();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -346,6 +524,7 @@ const repoRoot = resolve(__dirname, '..', '..');
 
 const stateModuleUrl = pathToFileURL(resolve(repoRoot, 'app/static/js/state.js'));
 const playerModuleUrl = pathToFileURL(resolve(repoRoot, 'app/static/js/player.js'));
+const searchModuleUrl = pathToFileURL(resolve(repoRoot, 'app/static/js/search.js'));
 
 const stateModule = await import(stateModuleUrl.href);
 
@@ -358,6 +537,8 @@ globalThis.YT = window.YT;
 
 const playerModule = await import(playerModuleUrl.href);
 const { playSearchOnYouTube, bindPlayerControls } = playerModule;
+const searchModule = await import(searchModuleUrl.href);
+const { runRecommend, runAutoRecommend } = searchModule;
 
 bindPlayerControls();
 
@@ -434,3 +615,67 @@ assert.ok(
 );
 
 console.log('YouTube player functional scenario passed');
+
+dom.recommendGenre.value = 'test';
+dom.recommendTags.value = 'epic, battle';
+
+queueFetchResponse(
+  makeJsonResponse({
+    genre: 'test',
+    scene: 'battle',
+    playlists: [],
+    hysteresis: {},
+    tags: ['epic', 'battle'],
+  }),
+);
+
+await runRecommend();
+
+assert.equal(stateModule.state.scene, 'battle', 'После runRecommend состояние должно обновить сцену');
+assert.equal(dom.sceneSelect.value, 'battle', 'Select сцены должен совпадать с рекомендацией');
+
+const chipsAfterRecommend = document.querySelectorAll('.scene-chip');
+assert.equal(
+  chipsAfterRecommend.length,
+  2,
+  'После runRecommend должно отображаться по кнопке на каждую сцену жанра',
+);
+const activeAfterRecommend = chipsAfterRecommend
+  .filter((chip) => chip.classList.contains('active'))
+  .map((chip) => chip.dataset.scene);
+assert.deepEqual(
+  activeAfterRecommend,
+  ['battle'],
+  'После runRecommend активной должна быть рекомендованная сцена',
+);
+
+queueFetchResponse(
+  makeJsonResponse({
+    genre: 'test',
+    scene: 'camp',
+    playlists: [],
+    hysteresis: {},
+    tags: ['calm'],
+  }),
+);
+
+await runAutoRecommend(['calm']);
+
+assert.equal(
+  stateModule.state.scene,
+  'camp',
+  'runAutoRecommend должен обновлять текущую сцену в состоянии',
+);
+assert.equal(dom.sceneSelect.value, 'camp', 'Select сцены должен обновляться после runAutoRecommend');
+
+const chipsAfterAuto = document.querySelectorAll('.scene-chip');
+const activeAfterAuto = chipsAfterAuto
+  .filter((chip) => chip.classList.contains('active'))
+  .map((chip) => chip.dataset.scene);
+assert.deepEqual(
+  activeAfterAuto,
+  ['camp'],
+  'После runAutoRecommend подсветка должна соответствовать новой сцене',
+);
+
+console.log('Recommendation scene selection scenario passed');
