@@ -22,7 +22,6 @@ genres:
         volume: 85
         crossfade: 3
         cooldown_sec: 75
-        youtube_playlist_id: "PL9tY0BWXOZFwFantasyBattle"
         providers:
           - name: youtube_music
             description: "Поиск на YouTube Music"
@@ -35,9 +34,6 @@ genres:
         volume: 70
         crossfade: 5
         cooldown_sec: 90
-        youtube_video_ids:
-          - dQw4w9WgXcQ
-          - 5NV6Rdv1a3I
         providers:
           - name: youtube_music
             description: "Атмосферные треки таверны на YouTube Music"
