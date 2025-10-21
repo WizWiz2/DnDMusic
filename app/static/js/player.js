@@ -618,6 +618,17 @@ function performPlaylistLoad(player, request) {
         });
         lastQuery = youtubeQuery;
       }
+      try {
+        player.playVideo();
+        console.log('[performPlaylistLoad] playVideo invoked immediately after load');
+      } catch (error) {
+        const errorName = error?.name || error?.constructor?.name || 'UnknownError';
+        const logMethod = errorName === 'NotAllowedError' ? 'debug' : 'warn';
+        console[logMethod](
+          '[performPlaylistLoad] Unable to start playback immediately',
+          { error, errorName },
+        );
+      }
       setTimeout(() => {
         try {
           console.log('[performPlaylistLoad] setTimeout fired after loadPlaylist', { isUserGestureUnlocked });
