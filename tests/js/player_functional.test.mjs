@@ -546,7 +546,7 @@ const { dom } = stateModule;
 
 playSearchOnYouTube(
   {
-    query: 'manual test query',
+    query: 'manual test query -vocals',
     youtube_video_ids: ['AAA111', 'BBB222'],
   },
   {
@@ -573,9 +573,10 @@ dom.playerPlayBtn.click();
 await sleep(80);
 
 const unlockedBaseline = FakeYTPlayer.loadHistory.length;
-assert.ok(
-  unlockedBaseline >= baselineCalls,
-  'Количество вызовов loadPlaylist не должно уменьшаться после разблокировки',
+assert.equal(
+  unlockedBaseline,
+  baselineCalls,
+  'Не должно быть дополнительных вызовов loadPlaylist при разблокировке',
 );
 
 let historyBaseline = unlockedBaseline;
@@ -612,6 +613,21 @@ const manualListEntriesAfterSecond = newEntriesAfterSecondError.filter((entry) =
 assert.ok(
   manualListEntriesAfterSecond.every((entry) => !arraysEqual(entry.items, [])),
   'После исчерпания ручного списка не должно быть пустых ручных загрузок',
+);
+
+historyBaseline = FakeYTPlayer.loadHistory.length;
+
+playerInstance.triggerError(2);
+
+await sleep(900);
+
+const entriesAfterSearchError = FakeYTPlayer.loadHistory.slice(historyBaseline);
+const repeatedSearch = entriesAfterSearchError.find(
+  (entry) => entry.type === 'search' && entry.request?.list === 'manual test query',
+);
+assert.ok(
+  repeatedSearch,
+  'Если после перехода к поисковому плейлисту снова возникает ошибка, поиск должен перезапускаться',
 );
 
 console.log('YouTube player functional scenario passed');

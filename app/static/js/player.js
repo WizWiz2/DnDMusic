@@ -21,11 +21,50 @@ const ERROR_REPORT_THROTTLE_MS = 8000;
 let lastErrorReportSentAt = 0;
 let lastErrorReportSignature = null;
 
+function collapseWhitespace(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function sanitizeYouTubeSearchQuery(value) {
+  const collapsed = collapseWhitespace(value);
+  if (!collapsed) {
+    return '';
+  }
+  const tokens = collapsed.split(' ');
+  const filtered = tokens.filter((token) => {
+    if (typeof token !== 'string') {
+      return false;
+    }
+    const trimmed = token.trim();
+    if (!trimmed) {
+      return false;
+    }
+    if (trimmed === '-') {
+      return false;
+    }
+    if (trimmed.startsWith('-')) {
+      const remainder = trimmed.replace(/^-+/, '');
+      if (!remainder.length) {
+        return false;
+      }
+      return false;
+    }
+    return true;
+  });
+  if (!filtered.length) {
+    return collapsed;
+  }
+  return filtered.join(' ');
+}
+
 function sendPlayerErrorReport(report) {
   const signatureParts = [
     report.errorCode,
     report.videoId || 'none',
-    report.request?.query || 'no-query',
+    report.request?.searchQuery || report.request?.query || 'no-query',
   ];
   const signature = signatureParts.join('|');
   const now = Date.now();
@@ -280,6 +319,23 @@ function createOrGetPlayer() {
         const videoTitle = videoData?.title ? ` — ${videoData.title}` : '';
         const playlistItems = Array.isArray(playlist) ? playlist.length : 0;
         const hasValidIndex = typeof playlistIndex === 'number' && playlistIndex >= 0;
+        const playlistEmpty = playlistItems === 0;
+        const playlistTooShort = playlistItems <= 1;
+        const playlistAtEnd =
+          hasValidIndex && playlistItems > 0 && playlistIndex >= playlistItems - 1;
+        const retryReasons = [];
+        if (playlistEmpty) {
+          retryReasons.push('playlist-empty');
+        }
+        if (!hasValidIndex) {
+          retryReasons.push('invalid-index');
+        }
+        if (playlistTooShort && !playlistEmpty) {
+          retryReasons.push('playlist-too-short');
+        }
+        if (playlistAtEnd && !playlistEmpty) {
+          retryReasons.push('playlist-end');
+        }
         const manualList = Array.isArray(lastPlaylistRequest?.manualVideoIds)
           ? lastPlaylistRequest.manualVideoIds
               .map((id) => String(id || '').trim())
@@ -366,17 +422,25 @@ function createOrGetPlayer() {
         manualListRemainingLength = manualList.length;
 
         const shouldRetrySearch =
-          !hasValidIndex && playlistItems === 0 && lastPlaylistRequest && consecutivePlaybackErrors <= 4;
+          lastPlaylistRequest && consecutivePlaybackErrors <= 4 && retryReasons.length > 0;
 
         const sanitizedRequest = lastPlaylistRequest
           ? (() => {
               const desiredVolNumber = Number(lastPlaylistRequest.desiredVol);
               const crossfadeNumber = Number(lastPlaylistRequest.crossfadeSec);
-              return {
+              const searchQueryValue =
+                typeof lastPlaylistRequest.searchQuery === 'string'
+                  ? collapseWhitespace(lastPlaylistRequest.searchQuery)
+                  : '';
+              const payload = {
                 query: String(lastPlaylistRequest.query ?? ''),
                 desiredVol: Number.isFinite(desiredVolNumber) ? desiredVolNumber : null,
                 crossfadeSec: Number.isFinite(crossfadeNumber) ? crossfadeNumber : null,
               };
+              if (searchQueryValue) {
+                payload.searchQuery = searchQueryValue;
+              }
+              return payload;
             })()
           : null;
         const report = {
@@ -400,10 +464,14 @@ function createOrGetPlayer() {
         sendPlayerErrorReport(report);
 
         if (shouldRetrySearch) {
+          const reasonLabel = retryReasons.join(', ') || 'unknown-reason';
           setPlayerStatus(`Видео недоступно (ошибка ${errorCode}${videoTitle}), повторяю поиск…`, 'warn');
           setTimeout(() => {
             try {
-              appendPlayerLog('Повторная загрузка плейлиста после ошибки YouTube', 'debug');
+              appendPlayerLog(
+                `Повторная загрузка плейлиста после ошибки YouTube (причина: ${reasonLabel})`,
+                'debug',
+              );
               performPlaylistLoad(ytPlayer, lastPlaylistRequest);
             } catch (error) {
               console.error('Не удалось повторить поиск после ошибки YouTube', error);
@@ -463,8 +531,20 @@ function performPlaylistLoad(player, request) {
   if (!player || !request) {
     return;
   }
+  const rawQuery = typeof request.query === 'string' ? request.query : '';
+  const normalizedQuery = collapseWhitespace(rawQuery);
+  const providedSearchQuery =
+    typeof request.searchQuery === 'string' ? collapseWhitespace(request.searchQuery) : '';
+  const sanitizedQuery = sanitizeYouTubeSearchQuery(normalizedQuery);
+  const searchQuery = providedSearchQuery
+    ? providedSearchQuery
+    : sanitizedQuery
+    ? sanitizedQuery
+    : normalizedQuery;
+
   const normalizedRequest = {
-    query: typeof request.query === 'string' ? request.query : '',
+    query: normalizedQuery,
+    searchQuery,
     desiredVol: Number(request.desiredVol ?? lastSetVolume),
     crossfadeSec: Number(request.crossfadeSec ?? 3),
     playlistId:
@@ -478,7 +558,9 @@ function performPlaylistLoad(player, request) {
       : [],
   };
 
-  const { query, desiredVol, crossfadeSec, playlistId, manualVideoIds } = normalizedRequest;
+  const { query, searchQuery: youtubeSearchQuery, desiredVol, crossfadeSec, playlistId, manualVideoIds } =
+    normalizedRequest;
+  const effectiveSearchQuery = youtubeSearchQuery || query;
   const hasManualList = manualVideoIds.length > 0;
   const hasPlaylistId = playlistId.length > 0;
 
@@ -489,6 +571,12 @@ function performPlaylistLoad(player, request) {
     setPlayerStatus(`Загружаем указанный плейлист: ${playlistId}`, 'info');
   } else if (query) {
     setPlayerStatus(`Загружаем музыку по запросу: ${query}`, 'info');
+    if (effectiveSearchQuery !== query) {
+      appendPlayerLog(
+        `YouTube не принимает операторы исключения, используем упрощённый запрос: ${effectiveSearchQuery}`,
+        'debug',
+      );
+    }
   } else {
     setPlayerStatus('Загружаем музыку…', 'info');
   }
@@ -504,6 +592,7 @@ function performPlaylistLoad(player, request) {
         console.log('[performPlaylistLoad] loadPlaylist invoked (manual list)', {
           manualVideoIds,
         });
+        lastQuery = 'manual_playlist';
       } else if (hasPlaylistId) {
         appendPlayerLog(
           `Запрос к YouTube: loadPlaylist → playlist ${playlistId}`,
@@ -513,10 +602,21 @@ function performPlaylistLoad(player, request) {
         console.log('[performPlaylistLoad] loadPlaylist invoked (playlist)', {
           playlistId,
         });
+        lastQuery = `playlist:${playlistId}`;
       } else {
-        appendPlayerLog(`Запрос к YouTube: loadPlaylist → ${query}`, 'debug');
-        player.loadPlaylist({ listType: 'search', list: query, index: 0 });
-        console.log('[performPlaylistLoad] loadPlaylist invoked (search)', { query });
+        const youtubeQuery = effectiveSearchQuery;
+        appendPlayerLog(
+          youtubeQuery !== query
+            ? `Запрос к YouTube: loadPlaylist → ${youtubeQuery} (из «${query}» без операторов)`
+            : `Запрос к YouTube: loadPlaylist → ${youtubeQuery}`,
+          'debug',
+        );
+        player.loadPlaylist({ listType: 'search', list: youtubeQuery, index: 0 });
+        console.log('[performPlaylistLoad] loadPlaylist invoked (search)', {
+          query: youtubeQuery,
+          originalQuery: query,
+        });
+        lastQuery = youtubeQuery;
       }
       setTimeout(() => {
         try {
@@ -548,6 +648,7 @@ function performPlaylistLoad(player, request) {
   console.log('[performPlaylistLoad] Entry', {
     request: {
       query,
+      searchQuery: youtubeSearchQuery,
       desiredVol,
       crossfadeSec,
       playlistId,
@@ -616,7 +717,10 @@ export function playSearchOnYouTube(result, meta) {
       ? { ...result }
       : { query: '' };
 
-  const query = typeof payload.query === 'string' ? payload.query : '';
+  const rawQuery = typeof payload.query === 'string' ? payload.query : '';
+  const query = collapseWhitespace(rawQuery);
+  const searchQueryCandidate = sanitizeYouTubeSearchQuery(query);
+  const searchQuery = searchQueryCandidate || query;
   const manualFromResult = normalizeVideoIds(payload.youtube_video_ids);
   const manualFromMeta = normalizeVideoIds(meta?.youtube_video_ids);
   const manualVideoIds = manualFromResult.length ? manualFromResult : manualFromMeta;
@@ -626,10 +730,14 @@ export function playSearchOnYouTube(result, meta) {
     query,
     youtube_playlist_id: playlistId,
     youtube_video_ids: manualVideoIds.slice(),
+    search_query: searchQuery,
   };
   lastQuery =
-    query ||
-    (playlistId ? `playlist:${playlistId}` : manualVideoIds.length ? 'manual_playlist' : '');
+    manualVideoIds.length
+      ? 'manual_playlist'
+      : playlistId
+      ? `playlist:${playlistId}`
+      : searchQuery;
   lastMeta = meta || null;
 
   ensureYouTubeApiLoaded(() => {
@@ -638,6 +746,7 @@ export function playSearchOnYouTube(result, meta) {
     const crossfadeSec = Number(meta?.crossfade ?? 3);
     const request = {
       query,
+      searchQuery,
       desiredVol,
       crossfadeSec,
       playlistId,
@@ -680,23 +789,43 @@ export function bindPlayerControls() {
     playerPlayBtn.addEventListener('click', () => {
       ensureYouTubeApiLoaded(() => {
         const player = createOrGetPlayer();
-        try {
-          player.playVideo();
-        } catch (error) {
-          console.warn('[PlayerControls] Unable to start playback via playVideo', error);
-        }
-        try {
-          player.unMute();
-        } catch (error) {
-          console.warn('[PlayerControls] Unable to unmute player', error);
-        }
+        const playlist =
+          typeof player.getPlaylist === 'function' ? player.getPlaylist() : null;
+        const playlistLength = Array.isArray(playlist) ? playlist.length : 0;
+        const hasPendingRequest = Boolean(lastPlaylistRequest);
+        const shouldResumePending = playlistLength === 0 && hasPendingRequest;
+        const shouldReplayLastSearch =
+          playlistLength === 0 && !hasPendingRequest && Boolean(lastSearchResult);
+
         isUserGestureUnlocked = true;
-        if (lastSearchResult) {
+
+        if (shouldResumePending && lastPlaylistRequest) {
+          if (!ytPlayerReady) {
+            shouldLoadWhenReady = true;
+          } else {
+            try {
+              performPlaylistLoad(player, lastPlaylistRequest);
+            } catch (error) {
+              console.error('[PlayerControls] Unable to resume pending playlist', error);
+            }
+          }
+        } else if (shouldReplayLastSearch && lastSearchResult) {
           try {
             playSearchOnYouTube(lastSearchResult, lastMeta);
           } catch (error) {
             console.error('[PlayerControls] Unable to resume last query', error);
           }
+        }
+
+        try {
+          player.unMute();
+        } catch (error) {
+          console.warn('[PlayerControls] Unable to unmute player', error);
+        }
+        try {
+          player.playVideo();
+        } catch (error) {
+          console.warn('[PlayerControls] Unable to start playback via playVideo', error);
         }
       });
     });
