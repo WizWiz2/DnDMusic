@@ -319,6 +319,23 @@ function createOrGetPlayer() {
         const videoTitle = videoData?.title ? ` — ${videoData.title}` : '';
         const playlistItems = Array.isArray(playlist) ? playlist.length : 0;
         const hasValidIndex = typeof playlistIndex === 'number' && playlistIndex >= 0;
+        const playlistEmpty = playlistItems === 0;
+        const playlistTooShort = playlistItems <= 1;
+        const playlistAtEnd =
+          hasValidIndex && playlistItems > 0 && playlistIndex >= playlistItems - 1;
+        const retryReasons = [];
+        if (playlistEmpty) {
+          retryReasons.push('playlist-empty');
+        }
+        if (!hasValidIndex) {
+          retryReasons.push('invalid-index');
+        }
+        if (playlistTooShort && !playlistEmpty) {
+          retryReasons.push('playlist-too-short');
+        }
+        if (playlistAtEnd && !playlistEmpty) {
+          retryReasons.push('playlist-end');
+        }
         const manualList = Array.isArray(lastPlaylistRequest?.manualVideoIds)
           ? lastPlaylistRequest.manualVideoIds
               .map((id) => String(id || '').trim())
@@ -405,7 +422,7 @@ function createOrGetPlayer() {
         manualListRemainingLength = manualList.length;
 
         const shouldRetrySearch =
-          !hasValidIndex && playlistItems === 0 && lastPlaylistRequest && consecutivePlaybackErrors <= 4;
+          lastPlaylistRequest && consecutivePlaybackErrors <= 4 && retryReasons.length > 0;
 
         const sanitizedRequest = lastPlaylistRequest
           ? (() => {
@@ -447,10 +464,14 @@ function createOrGetPlayer() {
         sendPlayerErrorReport(report);
 
         if (shouldRetrySearch) {
+          const reasonLabel = retryReasons.join(', ') || 'unknown-reason';
           setPlayerStatus(`Видео недоступно (ошибка ${errorCode}${videoTitle}), повторяю поиск…`, 'warn');
           setTimeout(() => {
             try {
-              appendPlayerLog('Повторная загрузка плейлиста после ошибки YouTube', 'debug');
+              appendPlayerLog(
+                `Повторная загрузка плейлиста после ошибки YouTube (причина: ${reasonLabel})`,
+                'debug',
+              );
               performPlaylistLoad(ytPlayer, lastPlaylistRequest);
             } catch (error) {
               console.error('Не удалось повторить поиск после ошибки YouTube', error);
@@ -768,23 +789,43 @@ export function bindPlayerControls() {
     playerPlayBtn.addEventListener('click', () => {
       ensureYouTubeApiLoaded(() => {
         const player = createOrGetPlayer();
-        try {
-          player.playVideo();
-        } catch (error) {
-          console.warn('[PlayerControls] Unable to start playback via playVideo', error);
-        }
-        try {
-          player.unMute();
-        } catch (error) {
-          console.warn('[PlayerControls] Unable to unmute player', error);
-        }
+        const playlist =
+          typeof player.getPlaylist === 'function' ? player.getPlaylist() : null;
+        const playlistLength = Array.isArray(playlist) ? playlist.length : 0;
+        const hasPendingRequest = Boolean(lastPlaylistRequest);
+        const shouldResumePending = playlistLength === 0 && hasPendingRequest;
+        const shouldReplayLastSearch =
+          playlistLength === 0 && !hasPendingRequest && Boolean(lastSearchResult);
+
         isUserGestureUnlocked = true;
-        if (lastSearchResult) {
+
+        if (shouldResumePending && lastPlaylistRequest) {
+          if (!ytPlayerReady) {
+            shouldLoadWhenReady = true;
+          } else {
+            try {
+              performPlaylistLoad(player, lastPlaylistRequest);
+            } catch (error) {
+              console.error('[PlayerControls] Unable to resume pending playlist', error);
+            }
+          }
+        } else if (shouldReplayLastSearch && lastSearchResult) {
           try {
             playSearchOnYouTube(lastSearchResult, lastMeta);
           } catch (error) {
             console.error('[PlayerControls] Unable to resume last query', error);
           }
+        }
+
+        try {
+          player.unMute();
+        } catch (error) {
+          console.warn('[PlayerControls] Unable to unmute player', error);
+        }
+        try {
+          player.playVideo();
+        } catch (error) {
+          console.warn('[PlayerControls] Unable to start playback via playVideo', error);
         }
       });
     });
