@@ -546,7 +546,7 @@ const { dom } = stateModule;
 
 playSearchOnYouTube(
   {
-    query: 'manual test query',
+    query: 'manual test query -vocals',
     youtube_video_ids: ['AAA111', 'BBB222'],
   },
   {
