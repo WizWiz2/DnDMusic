@@ -5,6 +5,7 @@ let ytPlayer = null;
 let ytPlayerReady = false;
 let lastSetVolume = 70;
 let isUserGestureUnlocked = false;
+let pendingAutoplayUnlock = false;
 let isFading = false;
 let consecutivePlaybackErrors = 0;
 let lastQuery = null;
@@ -20,6 +21,7 @@ const PLAYER_ERROR_ENDPOINT = '/api/player-errors';
 const ERROR_REPORT_THROTTLE_MS = 8000;
 let lastErrorReportSentAt = 0;
 let lastErrorReportSignature = null;
+const AUTOPLAY_BLOCK_STATUS = 'YouTube заблокировал автозапуск. Нажмите Play, чтобы продолжить.';
 
 function collapseWhitespace(value) {
   if (typeof value !== 'string') {
@@ -104,6 +106,24 @@ function setPlayerStatus(message, level = 'info') {
   appendPlayerLog(message, level);
   if (dom.playerStatus) {
     dom.playerStatus.textContent = message;
+  }
+}
+
+function handleAutoplayNotAllowed(error, context) {
+  const wasPending = pendingAutoplayUnlock;
+  pendingAutoplayUnlock = true;
+  const errorName = error?.name || error?.constructor?.name || 'UnknownError';
+  console.debug('[performPlaylistLoad] Autoplay blocked', {
+    context,
+    error,
+    errorName,
+  });
+  if (!wasPending) {
+    appendPlayerLog(
+      `YouTube заблокировал автозапуск (${context}). Нажмите Play, чтобы продолжить.`,
+      'warn',
+    );
+    setPlayerStatus(AUTOPLAY_BLOCK_STATUS, 'warn');
   }
 }
 
@@ -266,6 +286,7 @@ function createOrGetPlayer() {
         );
         switch (event.data) {
           case YTState.PLAYING:
+            pendingAutoplayUnlock = false;
             consecutivePlaybackErrors = 0;
             setPlayerStatus('Воспроизведение запущено.', 'success');
             break;
@@ -581,6 +602,8 @@ function performPlaylistLoad(player, request) {
     setPlayerStatus('Загружаем музыку…', 'info');
   }
 
+  pendingAutoplayUnlock = false;
+
   const doPlay = () => {
     try {
       if (hasManualList) {
@@ -618,17 +641,41 @@ function performPlaylistLoad(player, request) {
         });
         lastQuery = youtubeQuery;
       }
+      try {
+        player.playVideo();
+        pendingAutoplayUnlock = false;
+        console.log('[performPlaylistLoad] playVideo invoked immediately after load');
+      } catch (error) {
+        const errorName = error?.name || error?.constructor?.name || 'UnknownError';
+        if (errorName === 'NotAllowedError') {
+          handleAutoplayNotAllowed(error, 'immediate');
+        } else {
+          console.warn('[performPlaylistLoad] Unable to start playback immediately', {
+            error,
+            errorName,
+          });
+        }
+      }
       setTimeout(() => {
         try {
           console.log('[performPlaylistLoad] setTimeout fired after loadPlaylist', { isUserGestureUnlocked });
-          if (isUserGestureUnlocked) {
-            player.playVideo();
-            console.log('[performPlaylistLoad] playVideo invoked from timeout');
-          } else {
-            console.log('[performPlaylistLoad] playVideo skipped: user gesture not unlocked');
+          if (!isUserGestureUnlocked) {
+            try {
+              player.mute();
+            } catch (muteError) {
+              console.debug('[performPlaylistLoad] Unable to enforce mute before retry', muteError);
+            }
           }
+          player.playVideo();
+          pendingAutoplayUnlock = false;
+          console.log('[performPlaylistLoad] playVideo invoked from timeout');
         } catch (error) {
-          console.error('[performPlaylistLoad] Error during delayed playVideo', error);
+          const errorName = error?.name || error?.constructor?.name || 'UnknownError';
+          if (errorName === 'NotAllowedError') {
+            handleAutoplayNotAllowed(error, 'delayed');
+          } else {
+            console.error('[performPlaylistLoad] Error during delayed playVideo', error);
+          }
         }
       }, 200);
       setVolumeSmooth(desiredVol, Math.max(200, crossfadeSec * 1000));
@@ -798,6 +845,7 @@ export function bindPlayerControls() {
           playlistLength === 0 && !hasPendingRequest && Boolean(lastSearchResult);
 
         isUserGestureUnlocked = true;
+        const wasPendingAutoplay = pendingAutoplayUnlock;
 
         if (shouldResumePending && lastPlaylistRequest) {
           if (!ytPlayerReady) {
@@ -824,8 +872,17 @@ export function bindPlayerControls() {
         }
         try {
           player.playVideo();
+          if (wasPendingAutoplay) {
+            pendingAutoplayUnlock = false;
+            setPlayerStatus('Запускаю воспроизведение…', 'info');
+          }
         } catch (error) {
-          console.warn('[PlayerControls] Unable to start playback via playVideo', error);
+          const errorName = error?.name || error?.constructor?.name || 'UnknownError';
+          if (errorName === 'NotAllowedError') {
+            handleAutoplayNotAllowed(error, 'user-play');
+          } else {
+            console.warn('[PlayerControls] Unable to start playback via playVideo', error);
+          }
         }
       });
     });

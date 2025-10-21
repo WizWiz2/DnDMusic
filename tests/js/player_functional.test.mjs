@@ -452,6 +452,12 @@ class FakeYTPlayer {
   }
 
   playVideo() {
+    if (typeof FakeYTPlayer.onBeforePlay === 'function') {
+      const shouldSkipDefault = FakeYTPlayer.onBeforePlay(this);
+      if (shouldSkipDefault === true) {
+        return;
+      }
+    }
     this.state = FakeYTPlayer.PlayerState.PLAYING;
     this.config.events?.onStateChange?.({ data: FakeYTPlayer.PlayerState.PLAYING });
   }
@@ -515,6 +521,7 @@ FakeYTPlayer.PlayerState = {
   BUFFERING: 3,
   CUED: 5,
 };
+FakeYTPlayer.onBeforePlay = null;
 
 const { beaconCalls, fetchCalls, queueFetchResponse } = setupEnvironment();
 
@@ -544,6 +551,19 @@ bindPlayerControls();
 
 const { dom } = stateModule;
 
+FakeYTPlayer.onBeforePlay = (() => {
+  let attempts = 0;
+  return () => {
+    attempts += 1;
+    if (attempts <= 2) {
+      const error = new Error('Autoplay blocked by browser');
+      error.name = 'NotAllowedError';
+      throw error;
+    }
+    return null;
+  };
+})();
+
 playSearchOnYouTube(
   {
     query: 'manual test query -vocals',
@@ -555,7 +575,15 @@ playSearchOnYouTube(
   },
 );
 
-await sleep(20);
+await sleep(260);
+
+assert.equal(
+  dom.playerStatus.textContent,
+  'YouTube заблокировал автозапуск. Нажмите Play, чтобы продолжить.',
+  'При блокировке автозапуска статус должен просить нажать Play',
+);
+
+FakeYTPlayer.onBeforePlay = null;
 
 const playerInstance = FakeYTPlayer.instances[0];
 assert.ok(playerInstance, 'Должен быть создан экземпляр плеера');
