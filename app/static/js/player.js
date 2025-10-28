@@ -191,21 +191,18 @@ function createOrGetPlayer() {
   }
   ytPlayerReady = false;
   const playerVars = {
-    autoplay: 0,
+    // Enable autoplay to allow muted playback without extra clicks
+    autoplay: 1,
     playsinline: 1,
     rel: 0,
     enablejsapi: 1,
   };
 
   try {
-    const { protocol, origin } = window.location || {};
-    if (protocol === 'https:' && typeof origin === 'string') {
+    const { origin } = window.location || {};
+    if (typeof origin === 'string' && origin) {
+      // Always pass origin for consistent IFrame API behaviour
       playerVars.origin = origin;
-    } else {
-      console.warn('[YouTubePlayer] Skipping origin hint for insecure context', {
-        protocol,
-        origin,
-      });
     }
   } catch (error) {
     console.warn('[YouTubePlayer] Unable to determine window origin', error);
@@ -631,12 +628,13 @@ function performPlaylistLoad(player, request) {
       }
       setTimeout(() => {
         try {
-          console.log('[performPlaylistLoad] setTimeout fired after loadPlaylist', { isUserGestureUnlocked });
-          if (isUserGestureUnlocked) {
+          const muted = typeof player.isMuted === 'function' ? !!player.isMuted() : false;
+          console.log('[performPlaylistLoad] setTimeout fired after loadPlaylist', { isUserGestureUnlocked, muted });
+          if (isUserGestureUnlocked || muted) {
             player.playVideo();
             console.log('[performPlaylistLoad] playVideo invoked from timeout');
           } else {
-            console.log('[performPlaylistLoad] playVideo skipped: user gesture not unlocked');
+            console.log('[performPlaylistLoad] playVideo skipped: user gesture not unlocked and not muted');
           }
         } catch (error) {
           console.error('[performPlaylistLoad] Error during delayed playVideo', error);
