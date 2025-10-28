@@ -93,6 +93,15 @@ class MusicService:
         if not result.youtube_video_ids and self._yt is not None:
             try:
                 ids = self._yt.search_embeddable_video_ids(result.query, max_results=15)
+                # Fallback: if the query is too restrictive, try a sanitized variant
+                if not ids:
+                    cleaned = self._sanitize_query_for_youtube(result.query)
+                    if cleaned and cleaned != result.query:
+                        ids = self._yt.search_embeddable_video_ids(cleaned, max_results=15)
+                # Last-resort: bias to background/copyright-safe phrasing
+                if not ids:
+                    alt = f"{self._sanitize_query_for_youtube(result.query)} background music no copyright"
+                    ids = self._yt.search_embeddable_video_ids(alt.strip(), max_results=15)
                 if ids:
                     result.youtube_video_ids = ids
             except YouTubeApiError:
@@ -204,10 +213,31 @@ class MusicService:
             if self._yt is not None:
                 try:
                     ids = self._yt.search_embeddable_video_ids(query, max_results=15)
+                    if not ids:
+                        cleaned = self._sanitize_query_for_youtube(query)
+                        if cleaned and cleaned != query:
+                            ids = self._yt.search_embeddable_video_ids(cleaned, max_results=15)
+                    if not ids:
+                        alt = f"{self._sanitize_query_for_youtube(query)} background music no copyright"
+                        ids = self._yt.search_embeddable_video_ids(alt.strip(), max_results=15)
                     if ids:
                         base_result.youtube_video_ids = ids
                 except YouTubeApiError:
                     pass
+
+    @staticmethod
+    def _sanitize_query_for_youtube(value: str) -> str:
+        """Remove unsupported/exclusion operators and collapse whitespace.
+
+        YouTube Data API search does not support minus-operators.  This helper
+        strips tokens that start with '-' and extra punctuation so that fallback
+        requests have a higher chance of returning embeddable results.
+        """
+        if not value:
+            return ""
+        tokens = [t.strip() for t in value.replace("\n", " ").split(" ")]
+        cleaned = [t for t in tokens if t and not t.startswith("-") and t != "-"]
+        return " ".join(cleaned)
 
         return RecommendationResult(
             genre=base_result.genre,
