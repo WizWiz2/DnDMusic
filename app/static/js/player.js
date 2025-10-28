@@ -16,6 +16,7 @@ let youtubeApiRequested = false;
 let youtubeApiReady = false;
 const youtubeApiQueue = [];
 let youtubeApiPollerActive = false;
+let ytUseNoCookieHost = false;
 const PLAYER_ERROR_ENDPOINT = '/api/player-errors';
 const ERROR_REPORT_THROTTLE_MS = 8000;
 let lastErrorReportSentAt = 0;
@@ -208,10 +209,15 @@ function createOrGetPlayer() {
     console.warn('[YouTubePlayer] Unable to determine window origin', error);
   }
 
+  const host = ytUseNoCookieHost
+    ? 'https://www.youtube-nocookie.com'
+    : 'https://www.youtube.com';
+
   ytPlayer = new YT.Player('player', {
     height: '390',
     width: '640',
     playerVars,
+    host,
     events: {
       onReady: () => {
         try {
@@ -333,6 +339,31 @@ function createOrGetPlayer() {
         if (playlistAtEnd && !playlistEmpty) {
           retryReasons.push('playlist-end');
         }
+        // Special-case error 2 (invalid parameter) which sometimes occurs with embedded search
+        // on some networks/cookie policies. Try switching to the youtube-nocookie host once.
+        if (errorCode === 2 && !ytUseNoCookieHost && lastPlaylistRequest) {
+          appendPlayerLog('Ошибка 2 от YouTube. Пробую режим youtube-nocookie…', 'debug');
+          try { ytPlayer?.destroy?.(); } catch (e) { /* ignore */ }
+          ytPlayer = null;
+          ytPlayerReady = false;
+          ytUseNoCookieHost = true;
+          setTimeout(() => {
+            try {
+              ensureYouTubeApiLoaded(() => {
+                const player = createOrGetPlayer();
+                try {
+                  performPlaylistLoad(player, lastPlaylistRequest);
+                } catch (err) {
+                  console.error('Не удалось перезапустить плейлист в режиме nocookie', err);
+                }
+              });
+            } catch (err) {
+              console.error('Сбой при переключении на youtube-nocookie', err);
+            }
+          }, 200);
+          return;
+        }
+
         const manualList = Array.isArray(lastPlaylistRequest?.manualVideoIds)
           ? lastPlaylistRequest.manualVideoIds
               .map((id) => String(id || '').trim())
