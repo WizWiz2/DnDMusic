@@ -57,6 +57,10 @@ class MusicService:
     ) -> None:
         self._config = config
         self._cache = TTLCache[Tuple[str, str], SearchResult](config.hysteresis.cache_ttl_sec)
+        # Cache for recommendation results to reduce external AI calls
+        self._rec_cache = TTLCache[Tuple[str, Tuple[str, ...]], RecommendationResult](
+            config.hysteresis.cache_ttl_sec
+        )
         self._ai_client = ai_client
         # YouTube Data API client is optional and only used when available
         self._yt = youtube_client or build_client_from_env()
@@ -171,13 +175,21 @@ class MusicService:
         return self._config.hysteresis.model_dump()
 
     def recommend(self, genre: str, tags: Iterable[str]) -> RecommendationResult:
-        normalized_tags = list(tags)
+        # Normalise + sort tags to improve cache hit rate
+        normalized_tags = [str(t).strip().lower() for t in tags if str(t).strip()]
+        normalized_tags.sort()
         if not normalized_tags:
             raise RecommendationUnavailableError(
                 "Нужен хотя бы один тег для рекомендации"
             )
         if not self._ai_client:
             raise RecommendationUnavailableError("Сервис рекомендаций не настроен")
+
+        # Check cache before hitting the external AI
+        cache_key_rec: Tuple[str, Tuple[str, ...]] = (genre.lower(), tuple(normalized_tags))
+        cached = self._rec_cache.get(cache_key_rec)
+        if cached:
+            return cached
 
         prediction, canonical_scene = self._call_ai(genre, normalized_tags)
 
@@ -239,7 +251,7 @@ class MusicService:
         cleaned = [t for t in tokens if t and not t.startswith("-") and t != "-"]
         return " ".join(cleaned)
 
-        return RecommendationResult(
+        result = RecommendationResult(
             genre=base_result.genre,
             scene=scene_slug,
             query=query,
@@ -251,6 +263,10 @@ class MusicService:
             confidence=prediction.confidence,
             reason=prediction.reason,
         )
+
+        # Store in cache and return
+        self._rec_cache.set(cache_key_rec, result)
+        return result
 
     def _call_ai(
         self, genre: str, tags: Iterable[str]
