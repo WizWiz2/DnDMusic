@@ -616,7 +616,12 @@ function performPlaylistLoad(player, request) {
           `Запрос к YouTube: loadPlaylist → ручной список (${manualVideoIds.length} видео)`,
           'debug',
         );
-        player.loadPlaylist(manualVideoIds, 0, 0);
+        if (typeof player.loadPlaylist === 'function') {
+          player.loadPlaylist(manualVideoIds, 0, 0);
+        } else {
+          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (manual list)');
+          return;
+        }
         console.log('[performPlaylistLoad] loadPlaylist invoked (manual list)', {
           manualVideoIds,
         });
@@ -626,7 +631,12 @@ function performPlaylistLoad(player, request) {
           `Запрос к YouTube: loadPlaylist → playlist ${playlistId}`,
           'debug',
         );
-        player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0 });
+        if (typeof player.loadPlaylist === 'function') {
+          player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0 });
+        } else {
+          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (playlist)');
+          return;
+        }
         console.log('[performPlaylistLoad] loadPlaylist invoked (playlist)', {
           playlistId,
         });
@@ -639,7 +649,12 @@ function performPlaylistLoad(player, request) {
             : `Запрос к YouTube: loadPlaylist → ${youtubeQuery}`,
           'debug',
         );
-        player.loadPlaylist({ listType: 'search', list: youtubeQuery, index: 0 });
+        if (typeof player.loadPlaylist === 'function') {
+          player.loadPlaylist({ listType: 'search', list: youtubeQuery, index: 0 });
+        } else {
+          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (search)');
+          return;
+        }
         console.log('[performPlaylistLoad] loadPlaylist invoked (search)', {
           query: youtubeQuery,
           originalQuery: query,
@@ -657,12 +672,19 @@ function performPlaylistLoad(player, request) {
           { error, errorName },
         );
       }
+      const expectedPlayer = player;
       setTimeout(() => {
         try {
+          if (expectedPlayer !== ytPlayer) {
+            console.debug('[performPlaylistLoad] Skipping delayed playVideo: player instance changed');
+            return;
+          }
           const muted = typeof player.isMuted === 'function' ? !!player.isMuted() : false;
           console.log('[performPlaylistLoad] setTimeout fired after loadPlaylist', { isUserGestureUnlocked, muted });
           if (isUserGestureUnlocked || muted) {
-            player.playVideo();
+            if (typeof player.playVideo === 'function') {
+              player.playVideo();
+            }
             console.log('[performPlaylistLoad] playVideo invoked from timeout');
           } else {
             console.log('[performPlaylistLoad] playVideo skipped: user gesture not unlocked and not muted');
@@ -827,8 +849,18 @@ export function bindPlayerControls() {
 
   if (playerPlayBtn) {
     playerPlayBtn.addEventListener('click', () => {
+      // Unlock autoplay policies as early as possible
+      isUserGestureUnlocked = true;
+
       ensureYouTubeApiLoaded(() => {
         const player = createOrGetPlayer();
+
+        // If the player is not yet fully ready, schedule load on ready and exit
+        if (!ytPlayerReady) {
+          shouldLoadWhenReady = true;
+          return;
+        }
+
         const playlist =
           typeof player.getPlaylist === 'function' ? player.getPlaylist() : null;
         const playlistLength = Array.isArray(playlist) ? playlist.length : 0;
@@ -837,17 +869,11 @@ export function bindPlayerControls() {
         const shouldReplayLastSearch =
           playlistLength === 0 && !hasPendingRequest && Boolean(lastSearchResult);
 
-        isUserGestureUnlocked = true;
-
         if (shouldResumePending && lastPlaylistRequest) {
-          if (!ytPlayerReady) {
-            shouldLoadWhenReady = true;
-          } else {
-            try {
-              performPlaylistLoad(player, lastPlaylistRequest);
-            } catch (error) {
-              console.error('[PlayerControls] Unable to resume pending playlist', error);
-            }
+          try {
+            performPlaylistLoad(player, lastPlaylistRequest);
+          } catch (error) {
+            console.error('[PlayerControls] Unable to resume pending playlist', error);
           }
         } else if (shouldReplayLastSearch && lastSearchResult) {
           try {
@@ -857,13 +883,18 @@ export function bindPlayerControls() {
           }
         }
 
+        // Guard player API calls behind readiness and feature detection
         try {
-          player.unMute();
+          if (typeof player.unMute === 'function') {
+            player.unMute();
+          }
         } catch (error) {
           console.warn('[PlayerControls] Unable to unmute player', error);
         }
         try {
-          player.playVideo();
+          if (typeof player.playVideo === 'function') {
+            player.playVideo();
+          }
         } catch (error) {
           console.warn('[PlayerControls] Unable to start playback via playVideo', error);
         }
