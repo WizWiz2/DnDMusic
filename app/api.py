@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+import logging
+import os
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -87,8 +89,25 @@ def get_ai_client() -> NeuralTaggerClient:
 
 @lru_cache(maxsize=1)
 def get_service_cached() -> MusicService:
+    # Diagnostics: detect environment and module presence
+    env_present = bool(os.getenv("YOUTUBE_API_KEY", "").strip())
+    module_present = True
+    try:
+        from . import youtube_client as _yt_mod  # noqa: F401
+    except Exception:
+        module_present = False
+
     yt_client = build_client_from_env()
-    return MusicService(get_config(), ai_client=get_ai_client(), youtube_client=yt_client)
+    logger = logging.getLogger("yt")
+    logger.info(
+        "YouTube Data API init: env_present=%s module_present=%s client_created=%s",
+        env_present,
+        module_present,
+        yt_client is not None,
+    )
+    return MusicService(
+        get_config(), ai_client=get_ai_client(), youtube_client=yt_client
+    )
 
 
 def get_service() -> MusicService:
@@ -139,13 +158,28 @@ async def yt_status(query: str | None = None) -> dict:
     and whether sample search for embeddable videos succeeds.
     """
 
+    # Low-level diagnostics (without leaking secrets)
+    result: dict[str, object] = {}
+    env_present = bool(os.getenv("YOUTUBE_API_KEY", "").strip())
+    result["env_present"] = env_present
+    try:
+        import httpx as _httpx  # noqa: F401
+        result["httpx_present"] = True
+    except Exception:
+        result["httpx_present"] = False
+    try:
+        from . import youtube_client as _yt_mod  # noqa: F401
+        result["module_present"] = True
+    except Exception:
+        result["module_present"] = False
+
     try:
         yt = build_client_from_env()
     except Exception:
         yt = None
 
     has_key = yt is not None
-    result: dict[str, object] = {"yt_client": has_key}
+    result["yt_client"] = has_key
     if not yt:
         return result
 
