@@ -17,6 +17,7 @@ let youtubeApiReady = false;
 const youtubeApiQueue = [];
 let youtubeApiPollerActive = false;
 let ytUseNoCookieHost = false;
+let ytInitialListParams = null; // optional { listType/list/playlist } to seed player on creation
 const PLAYER_ERROR_ENDPOINT = '/api/player-errors';
 const ERROR_REPORT_THROTTLE_MS = 8000;
 let lastErrorReportSentAt = 0;
@@ -199,6 +200,17 @@ function createOrGetPlayer() {
     enablejsapi: 1,
   };
 
+  // If we have initial list parameters (fallback path), merge them into playerVars
+  if (ytInitialListParams && typeof ytInitialListParams === 'object') {
+    try {
+      Object.assign(playerVars, ytInitialListParams);
+    } catch (e) {
+      console.warn('[YouTubePlayer] Unable to merge initial list params', e);
+    } finally {
+      ytInitialListParams = null;
+    }
+  }
+
   try {
     const { origin } = window.location || {};
     if (typeof origin === 'string' && origin) {
@@ -340,7 +352,7 @@ function createOrGetPlayer() {
           retryReasons.push('playlist-end');
         }
         // Special-case error 2 (invalid parameter) which sometimes occurs with embedded search
-        // on some networks/cookie policies. Try switching to the youtube-nocookie host once.
+        // on some networks/cookie policies. First try switching to the youtube-nocookie host once.
         if (errorCode === 2 && !ytUseNoCookieHost && lastPlaylistRequest) {
           appendPlayerLog('Ошибка 2 от YouTube. Пробую режим youtube-nocookie…', 'debug');
           try { ytPlayer?.destroy?.(); } catch (e) { /* ignore */ }
@@ -361,6 +373,12 @@ function createOrGetPlayer() {
               console.error('Сбой при переключении на youtube-nocookie', err);
             }
           }, 200);
+          return;
+        }
+        // If we're already on nocookie and still see error 2 — rebuild the player with initial list params.
+        if (errorCode === 2 && ytUseNoCookieHost && lastPlaylistRequest) {
+          appendPlayerLog('Ошибка 2 сохраняется в режиме nocookie. Пересоздаю плеер с начальным списком…', 'debug');
+          recreatePlayerWithInitialListFromRequest(lastPlaylistRequest);
           return;
         }
 
@@ -532,6 +550,37 @@ function createOrGetPlayer() {
   return ytPlayer;
 }
 
+function recreatePlayerWithInitialListFromRequest(request) {
+  try {
+    const manual = Array.isArray(request?.manualVideoIds)
+      ? request.manualVideoIds.map((id) => String(id || '').trim()).filter(Boolean)
+      : [];
+    const playlistId = typeof request?.playlistId === 'string' ? request.playlistId.trim() : '';
+    const query = typeof request?.searchQuery === 'string' && request.searchQuery.trim()
+      ? request.searchQuery.trim()
+      : typeof request?.query === 'string' ? request.query.trim() : '';
+
+    ytInitialListParams = {};
+    if (manual.length) {
+      ytInitialListParams.playlist = manual.join(',');
+    } else if (playlistId) {
+      ytInitialListParams.listType = 'playlist';
+      ytInitialListParams.list = playlistId;
+    } else if (query) {
+      ytInitialListParams.listType = 'search';
+      ytInitialListParams.list = query;
+    }
+
+    try { ytPlayer?.destroy?.(); } catch (e) { /* ignore */ }
+    ytPlayer = null;
+    ytPlayerReady = false;
+    createOrGetPlayer();
+    appendPlayerLog('Пересоздан плеер с начальным списком (fallback).', 'debug');
+  } catch (error) {
+    console.error('[recreatePlayerWithInitialListFromRequest] Failed', error);
+  }
+}
+
 function setVolumeSmooth(target, durationMs = 600) {
   try {
     const start = lastSetVolume;
@@ -619,7 +668,8 @@ function performPlaylistLoad(player, request) {
         if (typeof player.loadPlaylist === 'function') {
           player.loadPlaylist(manualVideoIds, 0, 0);
         } else {
-          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (manual list)');
+          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (manual list) — rebuilding');
+          recreatePlayerWithInitialListFromRequest(normalizedRequest);
           return;
         }
         console.log('[performPlaylistLoad] loadPlaylist invoked (manual list)', {
@@ -634,7 +684,8 @@ function performPlaylistLoad(player, request) {
         if (typeof player.loadPlaylist === 'function') {
           player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0 });
         } else {
-          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (playlist)');
+          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (playlist) — rebuilding');
+          recreatePlayerWithInitialListFromRequest(normalizedRequest);
           return;
         }
         console.log('[performPlaylistLoad] loadPlaylist invoked (playlist)', {
@@ -652,7 +703,8 @@ function performPlaylistLoad(player, request) {
         if (typeof player.loadPlaylist === 'function') {
           player.loadPlaylist({ listType: 'search', list: youtubeQuery, index: 0 });
         } else {
-          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (search)');
+          console.warn('[performPlaylistLoad] loadPlaylist is not available on player (search) — rebuilding');
+          recreatePlayerWithInitialListFromRequest(normalizedRequest);
           return;
         }
         console.log('[performPlaylistLoad] loadPlaylist invoked (search)', {
