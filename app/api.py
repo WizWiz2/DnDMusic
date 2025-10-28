@@ -131,6 +131,40 @@ async def health(service: MusicService = Depends(get_service)) -> HealthStatus:
     return HealthStatus(genres=list(service.available_genres()))
 
 
+@app.get("/api/yt-status")
+async def yt_status(query: str | None = None) -> dict:
+    """Diagnostic endpoint for YouTube Data API availability.
+
+    Does not expose secrets. Indicates whether the server detected an API key
+    and whether sample search for embeddable videos succeeds.
+    """
+
+    try:
+        yt = build_client_from_env()
+    except Exception:
+        yt = None
+
+    has_key = yt is not None
+    result: dict[str, object] = {"yt_client": has_key}
+    if not yt:
+        return result
+
+    test_query = (query or "fantasy ambient background music").strip()
+    try:
+        ids = yt.search_embeddable_video_ids(test_query, max_results=5)
+        result.update({
+            "test_query": test_query,
+            "ids": ids,
+            "count": len(ids),
+        })
+    except Exception as exc:  # noqa: BLE001 - surface any errors verbatim
+        result.update({
+            "test_query": test_query,
+            "error": str(exc),
+        })
+    return result
+
+
 @app.head("/api/health")
 async def health_head(service: MusicService = Depends(get_service)) -> Response:
     """Lightweight HEAD variant of the health endpoint for platform probes."""
