@@ -12,7 +12,21 @@ from .models import (
     SearchResult,
 )
 from .ai_client import NeuralTaggerClient, NeuralTaggerError, ScenePrediction
-from .youtube_client import YouTubeDataClient, build_client_from_env, YouTubeApiError
+# Optional YouTube Data API client: code must run even if module/file is missing
+try:  # pragma: no cover - defensive import for partial deployments
+    from .youtube_client import (
+        YouTubeDataClient,  # type: ignore
+        build_client_from_env,  # type: ignore
+        YouTubeApiError,  # type: ignore
+    )
+except Exception:  # noqa: BLE001 - broad for robustness in runtime
+    YouTubeDataClient = None  # type: ignore
+
+    def build_client_from_env():  # type: ignore
+        return None
+
+    class YouTubeApiError(Exception):  # type: ignore
+        pass
 
 
 class MusicServiceError(Exception):

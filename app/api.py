@@ -25,7 +25,11 @@ from .music_service import (
     RecommendationUnavailableError,
     SceneNotFoundError,
 )
-from .youtube_client import build_client_from_env
+try:  # pragma: no cover - optional dependency
+    from .youtube_client import build_client_from_env  # type: ignore
+except Exception:  # noqa: BLE001
+    def build_client_from_env():  # type: ignore
+        return None
 from .ai_client import NeuralTaggerClient
 
 
