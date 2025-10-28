@@ -18,6 +18,7 @@ const youtubeApiQueue = [];
 let youtubeApiPollerActive = false;
 let ytUseNoCookieHost = false;
 let ytInitialListParams = null; // optional { listType/list/playlist } to seed player on creation
+let ytTriedEmbeddableFallback = false;
 const PLAYER_ERROR_ENDPOINT = '/api/player-errors';
 const ERROR_REPORT_THROTTLE_MS = 8000;
 let lastErrorReportSentAt = 0;
@@ -380,6 +381,26 @@ function createOrGetPlayer() {
           appendPlayerLog('Ошибка 2 сохраняется в режиме nocookie. Пересоздаю плеер с начальным списком…', 'debug');
           recreatePlayerWithInitialListFromRequest(lastPlaylistRequest);
           return;
+        }
+
+        // Errors 101/150 mean embedding is restricted by the owner. Try a more embeddable query once.
+        if ((errorCode === 101 || errorCode === 150) && lastPlaylistRequest && !ytTriedEmbeddableFallback) {
+          ytTriedEmbeddableFallback = true;
+          const baseQuery = lastPlaylistRequest.searchQuery || lastPlaylistRequest.query || '';
+          const embeddableQuery = [baseQuery, 'background music', 'no copyright'].filter(Boolean).join(' ');
+          const retryReq = { ...lastPlaylistRequest, searchQuery: embeddableQuery };
+          appendPlayerLog('Видео заблокировано для встраивания. Пробую более встраиваемый запрос…', 'warn');
+          setPlayerStatus('Многие видео из поиска не встраиваются. Пробую альтернативный запрос…', 'warn');
+          setTimeout(() => {
+            try { performPlaylistLoad(ytPlayer, retryReq); } catch (e) { console.error('Embeddable fallback failed', e); }
+          }, 360);
+          return;
+        }
+
+        // If still failing with 101/150 — open provider page to play externally.
+        if ((errorCode === 101 || errorCode === 150) && dom.providerOpenBtn && typeof dom.providerOpenBtn.click === 'function') {
+          appendPlayerLog('Открываю провайдера во внешней вкладке из-за блокировки встраивания.', 'warn');
+          try { dom.providerOpenBtn.click(); } catch (e) { /* ignore */ }
         }
 
         const manualList = Array.isArray(lastPlaylistRequest?.manualVideoIds)

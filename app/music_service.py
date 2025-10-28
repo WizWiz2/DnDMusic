@@ -12,6 +12,7 @@ from .models import (
     SearchResult,
 )
 from .ai_client import NeuralTaggerClient, NeuralTaggerError, ScenePrediction
+from .youtube_client import YouTubeDataClient, build_client_from_env, YouTubeApiError
 
 
 class MusicServiceError(Exception):
@@ -34,11 +35,17 @@ class MusicService:
     """Entry point for search logic."""
 
     def __init__(
-        self, config: MusicConfig, *, ai_client: NeuralTaggerClient | None = None
+        self,
+        config: MusicConfig,
+        *,
+        ai_client: NeuralTaggerClient | None = None,
+        youtube_client: YouTubeDataClient | None = None,
     ) -> None:
         self._config = config
         self._cache = TTLCache[Tuple[str, str], SearchResult](config.hysteresis.cache_ttl_sec)
         self._ai_client = ai_client
+        # YouTube Data API client is optional and only used when available
+        self._yt = youtube_client or build_client_from_env()
 
     def _get_scene_config(self, genre: str, scene: str) -> SceneConfig:
         try:
@@ -68,6 +75,15 @@ class MusicService:
             youtube_playlist_id=scene_config.youtube_playlist_id,
             youtube_video_ids=scene_config.youtube_video_ids,
         )
+        # If no manual list provided, try enriching with embeddable YouTube results
+        if not result.youtube_video_ids and self._yt is not None:
+            try:
+                ids = self._yt.search_embeddable_video_ids(result.query, max_results=15)
+                if ids:
+                    result.youtube_video_ids = ids
+            except YouTubeApiError:
+                # Non-fatal: keep result without manual list
+                pass
         self._cache.set(cache_key, result)
         return result
 
@@ -170,6 +186,14 @@ class MusicService:
                 hysteresis=self._config.hysteresis,
             )
             query = prediction.scene
+            # Enrich dynamic result using YouTube Data API when available
+            if self._yt is not None:
+                try:
+                    ids = self._yt.search_embeddable_video_ids(query, max_results=15)
+                    if ids:
+                        base_result.youtube_video_ids = ids
+                except YouTubeApiError:
+                    pass
 
         return RecommendationResult(
             genre=base_result.genre,

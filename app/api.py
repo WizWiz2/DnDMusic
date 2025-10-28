@@ -25,6 +25,7 @@ from .music_service import (
     RecommendationUnavailableError,
     SceneNotFoundError,
 )
+from .youtube_client import build_client_from_env
 from .ai_client import NeuralTaggerClient
 
 
@@ -82,7 +83,8 @@ def get_ai_client() -> NeuralTaggerClient:
 
 @lru_cache(maxsize=1)
 def get_service_cached() -> MusicService:
-    return MusicService(get_config(), ai_client=get_ai_client())
+    yt_client = build_client_from_env()
+    return MusicService(get_config(), ai_client=get_ai_client(), youtube_client=yt_client)
 
 
 def get_service() -> MusicService:
