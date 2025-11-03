@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Iterable, Optional
+from typing import Iterable, Optional, List, Dict
 from urllib.parse import urlparse
 
 import httpx
+from .config import load_config
 
 
 DEFAULT_ENDPOINT = "http://localhost:8081/api/v1/recommend"
@@ -14,6 +15,7 @@ DEFAULT_TIMEOUT = 30.0
 ENV_ENDPOINT = "MUSIC_AI_ENDPOINT"
 ENV_TOKEN = "MUSIC_AI_TOKEN"
 ENV_TIMEOUT = "MUSIC_AI_TIMEOUT"
+ENV_HF_LABELS = "MUSIC_AI_CANDIDATE_LABELS"
 
 
 class NeuralTaggerError(RuntimeError):
@@ -45,6 +47,9 @@ class NeuralTaggerClient:
         self._timeout = self._resolve_timeout(timeout)
         self._token = token or os.getenv(ENV_TOKEN)
         self._transport = transport
+        # Optional override: comma-separated or JSON-like list of labels
+        self._hf_labels_env: Optional[List[str]] = self._parse_labels_env(os.getenv(ENV_HF_LABELS))
+        self._labels_cache: Dict[str, List[str]] = {}
 
     def recommend_scene(self, genre: str, tags: Iterable[str]) -> ScenePrediction:
         normalized_tags: list[str] = []
@@ -55,7 +60,11 @@ class NeuralTaggerClient:
         genre_text = str(genre).strip()
         prompt = self._build_prompt(genre_text, normalized_tags)
         if self._should_use_plain_prompt():
+            # Hugging Face zero-shot classification expects candidate labels
+            labels = self._candidate_labels_for_genre(genre_text)
             payload: dict[str, object] = {"inputs": prompt}
+            if labels:
+                payload["parameters"] = {"candidate_labels": labels}
         else:
             payload = {"prompt": prompt, "tags": normalized_tags}
             if genre_text:
@@ -88,6 +97,7 @@ class NeuralTaggerClient:
         # 1. {"scene": "battle", "confidence": 0.8, "reason": "..."}
         # 2. {"result": {"scene": "battle", ...}}
         # 3. {"scene": {"name": "battle", "confidence": 0.8, "comment": "..."}}
+        # 4. HuggingFace zero-shot: {"labels": ["battle", ...], "scores": [0.92, ...], "sequence": "..."}
         payload_data = data.get("result") if isinstance(data, dict) else None
         if isinstance(payload_data, dict):
             scene_block = payload_data.get("scene")
@@ -97,6 +107,15 @@ class NeuralTaggerClient:
             scene_block = data.get("scene") if isinstance(data, dict) else None
             confidence = data.get("confidence") if isinstance(data, dict) else None
             reason = data.get("reason") if isinstance(data, dict) else None
+
+        # Hugging Face zero-shot format handling
+        if scene_block is None and isinstance(data, dict) and "labels" in data and isinstance(data.get("labels"), list):
+            labels_list = data.get("labels") or []
+            scores_list = data.get("scores") or []
+            if labels_list:
+                scene_block = labels_list[0]
+                if not confidence and isinstance(scores_list, list) and scores_list:
+                    confidence = scores_list[0]
 
         raw_scene: Optional[str]
         if isinstance(scene_block, dict):
@@ -164,3 +183,65 @@ class NeuralTaggerClient:
         if not host:
             return False
         return host.endswith("huggingface.co") or host.endswith("hf.space")
+
+    def _candidate_labels_for_genre(self, genre: str | None) -> List[str]:
+        """Return candidate labels for HF zero-shot classification.
+
+        Priority:
+        - Explicit env override via MUSIC_AI_CANDIDATE_LABELS
+        - Scenes of the provided genre from the loaded config
+        - Fallback: all scenes across all genres
+        """
+        # Env override, if provided
+        if self._hf_labels_env:
+            return self._hf_labels_env
+
+        key = (genre or "").strip().lower() or "__all__"
+        if key in self._labels_cache:
+            return self._labels_cache[key]
+
+        try:
+            cfg = load_config()
+        except Exception:
+            self._labels_cache[key] = []
+            return []
+
+        labels: List[str] = []
+        if genre:
+            g = cfg.genres.get(key)
+            if g and g.scenes:
+                labels = sorted(g.scenes.keys())
+        if not labels:
+            # Fallback to union across all genres
+            seen = set()
+            for g in cfg.genres.values():
+                for s in g.scenes.keys():
+                    if s not in seen:
+                        seen.add(s)
+                        labels.append(s)
+            labels.sort()
+
+        self._labels_cache[key] = labels
+        return labels
+
+    @staticmethod
+    def _parse_labels_env(value: Optional[str]) -> Optional[List[str]]:
+        if not value:
+            return None
+        raw = value.strip()
+        if not raw:
+            return None
+        # Accept either comma-separated or JSON-like [..]
+        if raw.startswith("[") and raw.endswith("]"):
+            try:
+                # Minimal safe eval for JSON arrays
+                import json as _json
+
+                arr = _json.loads(raw)
+                return [str(x).strip() for x in arr if str(x).strip()]
+            except Exception:
+                pass
+        # Fallback: comma/semicolon separated list
+        parts = [p.strip() for p in raw.replace(";", ",").split(",")]
+        items = [p for p in parts if p]
+        return items or None
