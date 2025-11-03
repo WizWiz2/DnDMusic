@@ -87,8 +87,21 @@ class NeuralTaggerClient:
             raise NeuralTaggerError(message) from exc
 
         if response.status_code != 200:
+            text = response.text
+            # Дружественная подсказка, если сконфигурирована zero-shot модель HF
+            if (
+                self._should_use_plain_prompt()
+                and isinstance(text, str)
+                and "zero-shot-classification expects" in text
+            ):
+                raise NeuralTaggerError(
+                    "Эндпоинт Hugging Face настроен на zero-shot классификацию. "
+                    "Для генерации укажите модель text2text/text-generation, например: "
+                    "MUSIC_AI_ENDPOINT=https://api-inference.huggingface.co/models/ai-forever/ruT5-base "
+                    "или google/flan-t5-base."
+                )
             raise NeuralTaggerError(
-                f"Сервис рекомендаций вернул статус {response.status_code}: {response.text}"
+                f"Сервис рекомендаций вернул статус {response.status_code}: {text}"
             )
 
         data = response.json()
