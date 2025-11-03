@@ -236,21 +236,7 @@ class MusicService:
                         base_result.youtube_video_ids = ids
                 except YouTubeApiError:
                     pass
-
-    @staticmethod
-    def _sanitize_query_for_youtube(value: str) -> str:
-        """Remove unsupported/exclusion operators and collapse whitespace.
-
-        YouTube Data API search does not support minus-operators.  This helper
-        strips tokens that start with '-' and extra punctuation so that fallback
-        requests have a higher chance of returning embeddable results.
-        """
-        if not value:
-            return ""
-        tokens = [t.strip() for t in value.replace("\n", " ").split(" ")]
-        cleaned = [t for t in tokens if t and not t.startswith("-") and t != "-"]
-        return " ".join(cleaned)
-
+        # Build extended recommendation result based on base_result (either canonical or dynamic)
         result = RecommendationResult(
             genre=base_result.genre,
             scene=scene_slug,
@@ -267,6 +253,20 @@ class MusicService:
         # Store in cache and return
         self._rec_cache.set(cache_key_rec, result)
         return result
+
+    @staticmethod
+    def _sanitize_query_for_youtube(value: str) -> str:
+        """Remove unsupported/exclusion operators and collapse whitespace.
+
+        YouTube Data API search does not support minus-operators.  This helper
+        strips tokens that start with '-' and extra punctuation so that fallback
+        requests have a higher chance of returning embeddable results.
+        """
+        if not value:
+            return ""
+        tokens = [t.strip() for t in value.replace("\n", " ").split(" ")]
+        cleaned = [t for t in tokens if t and not t.startswith("-") and t != "-"]
+        return " ".join(cleaned)
 
     def _call_ai(
         self, genre: str, tags: Iterable[str]

@@ -92,6 +92,9 @@ class NeuralTaggerClient:
             )
 
         data = response.json()
+        # Surface model-side errors early when they come as JSON payloads
+        if isinstance(data, dict) and data.get("error"):
+            raise NeuralTaggerError(f"Сервис рекомендаций сообщил ошибку: {data.get('error')}")
 
         # API сервиса фиксирован, но на практике уже встречались варианты ответа:
         # 1. {"scene": "battle", "confidence": 0.8, "reason": "..."}
@@ -109,13 +112,24 @@ class NeuralTaggerClient:
             reason = data.get("reason") if isinstance(data, dict) else None
 
         # Hugging Face zero-shot format handling
-        if scene_block is None and isinstance(data, dict) and "labels" in data and isinstance(data.get("labels"), list):
-            labels_list = data.get("labels") or []
-            scores_list = data.get("scores") or []
-            if labels_list:
-                scene_block = labels_list[0]
-                if not confidence and isinstance(scores_list, list) and scores_list:
-                    confidence = scores_list[0]
+        if scene_block is None:
+            # Single-object response
+            if isinstance(data, dict) and "labels" in data and isinstance(data.get("labels"), list):
+                labels_list = data.get("labels") or []
+                scores_list = data.get("scores") or []
+                if labels_list:
+                    scene_block = labels_list[0]
+                    if not confidence and isinstance(scores_list, list) and scores_list:
+                        confidence = scores_list[0]
+            # Or list response (e.g. for multiple sequences) — take first
+            elif isinstance(data, list) and data and isinstance(data[0], dict):
+                first = data[0]
+                labels_list = first.get("labels") or []
+                scores_list = first.get("scores") or []
+                if labels_list:
+                    scene_block = labels_list[0]
+                    if not confidence and isinstance(scores_list, list) and scores_list:
+                        confidence = scores_list[0]
 
         raw_scene: Optional[str]
         if isinstance(scene_block, dict):
