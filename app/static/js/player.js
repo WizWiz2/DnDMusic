@@ -663,6 +663,8 @@ function performPlaylistLoad(player, request) {
   const hasPlaylistId = playlistId.length > 0;
 
   consecutivePlaybackErrors = 0;
+  // Reset single-shot fallbacks for a fresh request
+  ytTriedEmbeddableFallback = false;
   if (hasManualList) {
     setPlayerStatus(`Запускаем вручную подобранный плейлист (${manualVideoIds.length} видео).`, 'info');
   } else if (hasPlaylistId) {
@@ -681,6 +683,14 @@ function performPlaylistLoad(player, request) {
 
   const doPlay = () => {
     try {
+      // Force player to reload even if the same playlist/query is requested again.
+      try {
+        if (typeof player.stopVideo === 'function') {
+          player.stopVideo();
+        }
+      } catch (e) {
+        // non-fatal
+      }
       if (hasManualList) {
         appendPlayerLog(
           `Запрос к YouTube: loadPlaylist → ручной список (${manualVideoIds.length} видео)`,
@@ -703,7 +713,7 @@ function performPlaylistLoad(player, request) {
           'debug',
         );
         if (typeof player.loadPlaylist === 'function') {
-          player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0 });
+          player.loadPlaylist({ listType: 'playlist', list: playlistId, index: 0, startSeconds: 0 });
         } else {
           console.warn('[performPlaylistLoad] loadPlaylist is not available on player (playlist) — rebuilding');
           recreatePlayerWithInitialListFromRequest(normalizedRequest);
@@ -722,7 +732,7 @@ function performPlaylistLoad(player, request) {
           'debug',
         );
         if (typeof player.loadPlaylist === 'function') {
-          player.loadPlaylist({ listType: 'search', list: youtubeQuery, index: 0 });
+          player.loadPlaylist({ listType: 'search', list: youtubeQuery, index: 0, startSeconds: 0 });
         } else {
           console.warn('[performPlaylistLoad] loadPlaylist is not available on player (search) — rebuilding');
           recreatePlayerWithInitialListFromRequest(normalizedRequest);
