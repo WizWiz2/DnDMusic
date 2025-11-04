@@ -322,18 +322,24 @@ class NeuralTaggerClient:
 
         url = self._normalize_oai_url(endpoint)
         sys_prompt = (
-            "You are a helper that produces a single short English search query for background, "
-            "instrumental music. Return only the query, no quotes. Prefer adding '-vocals'."
+            "You produce a single short English search query for background instrumental music. "
+            "Rules: return ONLY the query text, 3-6 words, no quotes, no trailing punctuation. "
+            "Prefer adding '-vocals'. Avoid words like lyrics, vocal, lofi, podcast. "
+            "Use given hints when present."
         )
+
+        # Add lightweight EN keyword hints for RU tags/genres to stabilize generation
+        en_hints = self._build_en_hints_from_ru(prompt)
+        user_content = prompt if not en_hints else f"{prompt}\nHints (EN keywords): {', '.join(en_hints)}"
 
         payload = {
             "model": model,
             "messages": [
                 {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": user_content},
             ],
-            "temperature": 0.7,
-            "max_tokens": 64,
+            "temperature": 0.4,
+            "max_tokens": 32,
         }
 
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -360,6 +366,55 @@ class NeuralTaggerClient:
         if not text:
             raise NeuralTaggerError("Пустой ответ от генеративной модели")
         return ScenePrediction(scene=text.lower())
+
+    def _build_en_hints_from_ru(self, prompt_text: str) -> List[str]:
+        text = (prompt_text or "").lower()
+        hints: List[str] = []
+
+        # Generic music constraints
+        base = ["instrumental", "background", "soundtrack"]
+
+        # Genre heuristics
+        if "fantasy" in text or "фэнтези" in text or "средневек" in text:
+            hints += ["epic", "medieval", "fantasy"]
+        if "cyberpunk" in text or "киберпанк" in text:
+            hints += ["cyberpunk", "synthwave", "neon"]
+        if "horror" in text or "ужас" in text or "хоррор" in text:
+            hints += ["dark ambient", "horror"]
+        if "sci" in text or "науч" in text or "космос" in text or "space" in text:
+            hints += ["space", "ambient"]
+        if "post" in text or "пустош" in text:
+            hints += ["post apocalyptic"]
+        if "steampunk" in text or "стимпанк" in text:
+            hints += ["steampunk"]
+
+        # RU → EN tag keywords (substring-based)
+        mapping: List[tuple[List[str], List[str]]] = [
+            (["драка", "бой", "битва", "сраж"], ["battle"]),
+            (["дракон", "драко"], ["dragon"]),
+            (["таверн"], ["tavern", "medieval"]),
+            (["погон"], ["chase", "dnb"]),
+            (["стелс", "скрыт", "шпион"], ["stealth"]),
+            (["ритуал", "обряд"], ["ritual"]),
+            (["исслед", "развед"], ["exploration", "ambient"]),
+            (["трактир", "бар"], ["bar", "lounge"]),
+            (["лес", "дебр"], ["forest"]),
+            (["пещер", "подзем", "данж"], ["dungeon"]),
+            (["город"], ["city"]),
+            (["страш", "жутк", "кошмар"], ["creepy", "dark"]),
+        ]
+        for triggers, words in mapping:
+            if any(t in text for t in triggers):
+                for w in words:
+                    if w not in hints:
+                        hints.append(w)
+
+        # Always include base constraints at the end
+        for w in base:
+            if w not in hints:
+                hints.append(w)
+
+        return hints[:10]
 
     def _resolve_timeout(self, timeout: float | None) -> float:
         if timeout is not None:

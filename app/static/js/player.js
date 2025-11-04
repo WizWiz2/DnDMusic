@@ -1022,3 +1022,20 @@ export function bindPlayerControls() {
     });
   }
 }
+
+// Разблокирует автоплей после любого пользовательского клика в UI
+export function unlockAutoplay() {
+  isUserGestureUnlocked = true;
+  if (ytPlayer) {
+    try {
+      if (typeof ytPlayer.unMute === 'function') {
+        ytPlayer.unMute();
+      }
+      if (typeof ytPlayer.setVolume === 'function') {
+        ytPlayer.setVolume(lastSetVolume);
+      }
+    } catch (error) {
+      console.debug('[unlockAutoplay] Unable to unmute/set volume', error);
+    }
+  }
+}

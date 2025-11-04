@@ -1,6 +1,7 @@
 import { dom, state, initialData } from './state.js';
 import { applyTheme } from './theme.js';
 import { populateScenes, renderSceneButtons, updateSceneButtonsHighlight, getSceneMeta } from './scenes.js';
+import { unlockAutoplay } from './player.js';
 import { showResult, renderHysteresis } from './results.js';
 
 async function extractErrorMessage(response, fallbackMessage, context) {
@@ -38,6 +39,8 @@ async function extractErrorMessage(response, fallbackMessage, context) {
 }
 
 export async function runSearch(sceneOverride) {
+  // Любое нажатие на кнопку — валидный пользовательский жест для разблокировки звука
+  unlockAutoplay();
   const { searchStatus, searchButton, sceneSelect } = dom;
   if (!state.genre) {
     if (searchStatus) {
@@ -89,6 +92,8 @@ export async function runSearch(sceneOverride) {
 }
 
 export async function runRecommend() {
+  // Нажатие на «Рекомендовать сцену» считается пользовательским жестом — разблокируем звук
+  unlockAutoplay();
   const { recommendGenre, recommendTags, recommendStatus, recommendButton, genreSelect, sceneSelect } = dom;
   const genre = recommendGenre?.value;
   const tags = recommendTags?.value
