@@ -5,7 +5,7 @@
  * Falls back to Web Speech API if Whisper is not available.
  */
 
-import { dom } from './state.js';
+import { dom, logRecognition } from './state.js';
 import { runAutoRecommend } from './search.js';
 
 // State
@@ -31,9 +31,7 @@ export async function initWhisper() {
 
   try {
     isLoading = true;
-    if (whisperStatus) {
-      whisperStatus.textContent = 'Загружаем Whisper-модель (~40MB)...';
-    }
+    logRecognition('🧠 Загружаем Whisper-модель (~40MB)...', 'info');
 
     // Dynamic import of Transformers.js
     const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
@@ -42,15 +40,11 @@ export async function initWhisper() {
       quantized: true, // Use quantized model for faster loading
     });
 
-    if (whisperStatus) {
-      whisperStatus.textContent = 'Whisper готов к работе!';
-    }
+    logRecognition('✅ Whisper готов к работе!', 'output');
     return true;
   } catch (error) {
     console.error('Failed to load Whisper:', error);
-    if (whisperStatus) {
-      whisperStatus.textContent = 'Whisper недоступен. Используем Web Speech API.';
-    }
+    logRecognition(`❌ Whisper недоступен: ${error.message}`, 'error');
     return false;
   } finally {
     isLoading = false;
@@ -166,20 +160,16 @@ export async function startRecording() {
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       audioChunks = [];
 
-      if (whisperStatus) {
-        whisperStatus.textContent = 'Распознаём речь...';
-      }
+      logRecognition('🔄 Распознаём речь (Whisper)...', 'info');
 
       const text = await transcribeAudio(audioBlob);
 
       if (text) {
-        if (whisperStatus) {
-          whisperStatus.textContent = `Распознано: "${text.substring(0, 50)}..."`;
-        }
+        logRecognition(`📝 Whisper вход: "${text}"`, 'input');
         // Send to backend for scene recommendation
         await sendToBackend(text);
-      } else if (whisperStatus) {
-        whisperStatus.textContent = 'Не удалось распознать речь.';
+      } else {
+        logRecognition('⚠️ Whisper: не удалось распознать речь', 'error');
       }
 
       // Continue recording if still active
@@ -191,14 +181,10 @@ export async function startRecording() {
     isRecording = true;
     startNextChunk();
 
-    if (whisperStatus) {
-      whisperStatus.textContent = 'Слушаю... (Whisper)';
-    }
+    logRecognition('🧠 Whisper слушает...', 'info');
   } catch (error) {
     console.error('Failed to start recording:', error);
-    if (whisperStatus) {
-      whisperStatus.textContent = `Ошибка микрофона: ${error.message}`;
-    }
+    logRecognition(`❌ Ошибка микрофона: ${error.message}`, 'error');
   }
 }
 
@@ -234,10 +220,7 @@ export function stopRecording() {
 
   mediaRecorder = null;
 
-  const { whisperStatus } = dom;
-  if (whisperStatus) {
-    whisperStatus.textContent = 'Whisper остановлен.';
-  }
+  logRecognition('⏹ Whisper остановлен', 'info');
 }
 
 /**
