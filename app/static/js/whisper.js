@@ -16,7 +16,7 @@ let mediaRecorder = null;
 let audioChunks = [];
 
 // Configuration
-const WHISPER_MODEL = 'Xenova/whisper-tiny';
+const WHISPER_MODEL = 'Xenova/whisper-small'; // ~240MB, better Russian support
 const CHUNK_DURATION_MS = 8000; // Record 8 seconds at a time
 
 /**
@@ -31,7 +31,7 @@ export async function initWhisper() {
 
   try {
     isLoading = true;
-    logRecognition('🧠 Загружаем Whisper-модель (~40MB)...', 'info');
+    logRecognition('🧠 Загружаем Whisper-модель (~240MB, первый раз долго)...', 'info');
 
     // Dynamic import of Transformers.js
     const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
