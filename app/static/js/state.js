@@ -44,6 +44,9 @@ export const dom = {
   providerOpenBtn: document.getElementById('provider-open'),
   whisperToggle: document.getElementById('whisper-toggle'),
   whisperStatus: document.getElementById('whisper-status'),
+  // Recognition log
+  recognitionLog: document.getElementById('recognition-log'),
+  recognitionLogClear: document.getElementById('recognition-log-clear'),
 };
 
 export function formatLabel(value) {
@@ -51,4 +54,30 @@ export function formatLabel(value) {
     .split('_')
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+/**
+ * Log message to recognition log panel
+ * @param {string} message - Message to log
+ * @param {'info'|'input'|'output'|'error'|'decision'} type - Log type
+ */
+export function logRecognition(message, type = 'info') {
+  const log = dom.recognitionLog;
+  if (!log) return;
+
+  const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  entry.textContent = `[${time}] ${message}`;
+  log.appendChild(entry);
+  log.scrollTop = log.scrollHeight;
+}
+
+// Clear recognition log button
+if (dom.recognitionLogClear) {
+  dom.recognitionLogClear.addEventListener('click', () => {
+    if (dom.recognitionLog) {
+      dom.recognitionLog.innerHTML = '<div class="log-entry info">Журнал очищен.</div>';
+    }
+  });
 }

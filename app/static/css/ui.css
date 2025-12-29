@@ -392,4 +392,66 @@
         font-size: 0.78rem;
         color: rgba(15, 23, 42, 0.7);
       }
+
+      /* Recognition Log Styles */
+      .recognition-log-container {
+        background: rgba(255, 255, 255, 0.72);
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+      }
+
+      .recognition-log-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+
+      .recognition-log-title {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+
+      .recognition-log {
+        height: 180px;
+        overflow-y: auto;
+        font-family: "JetBrains Mono", "Fira Code", monospace;
+        font-size: 0.75rem;
+        line-height: 1.5;
+        background: rgba(0, 0, 0, 0.03);
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      .log-entry {
+        padding: 4px 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      }
+
+      .log-entry:last-child {
+        border-bottom: none;
+      }
+
+      .log-entry.info {
+        color: var(--text-secondary);
+      }
+
+      .log-entry.input {
+        color: #1e40af;
+      }
+
+      .log-entry.output {
+        color: var(--accent);
+      }
+
+      .log-entry.error {
+        color: #b91c1c;
+      }
+
+      .log-entry.decision {
+        color: #7c3aed;
+        font-weight: 600;
+      }
     

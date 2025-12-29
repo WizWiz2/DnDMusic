@@ -1,4 +1,4 @@
-import { dom, initialData } from './state.js';
+import { dom, initialData, logRecognition } from './state.js';
 import { runAutoRecommend } from './search.js';
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -72,28 +72,22 @@ function startListening() {
   recognition.onstart = () => {
     listening = true;
     if (micToggle) {
-      micToggle.textContent = '⏸ Остановить прослушивание';
+      micToggle.textContent = '⏹ Стоп';
     }
-    if (micStatus) {
-      micStatus.textContent = 'Идёт прослушивание… говорите фразы естественно.';
-    }
+    logRecognition('🎙 Микрофон включён, слушаю...', 'info');
   };
 
   recognition.onerror = (event) => {
     console.error(event);
-    if (micStatus) {
-      micStatus.textContent = 'Ошибка распознавания речи.';
-    }
+    logRecognition(`❌ Ошибка: ${event.error}`, 'error');
   };
 
   recognition.onend = () => {
     listening = false;
     if (micToggle) {
-      micToggle.textContent = '🎙 Включить прослушивание';
+      micToggle.textContent = '🎙 Микрофон';
     }
-    if (micStatus) {
-      micStatus.textContent = 'Распознавание речи выключено.';
-    }
+    logRecognition('⏹ Микрофон выключен', 'info');
   };
 
   recognition.onresult = (event) => {
@@ -106,17 +100,19 @@ function startListening() {
     }
     if (finalText.trim()) {
       const now = Date.now();
+      logRecognition(`📝 Вход: "${finalText.trim()}"`, 'input');
       const tags = extractTags(finalText);
       if (tags.length) {
-        if (micStatus) {
-          micStatus.textContent = `Распознано: ${finalText.trim()} → теги: ${tags.join(', ')}`;
-        }
+        logRecognition(`🏷 Теги: [${tags.join(', ')}]`, 'output');
         if (canFireAuto(now)) {
           lastAutoAt = now;
+          logRecognition(`🚀 Решение: отправляем рекомендацию с тегами [${tags.join(', ')}]`, 'decision');
           runAutoRecommend(tags);
+        } else {
+          logRecognition('⏳ Пропуск: антидребезг (cooldown)', 'info');
         }
-      } else if (micStatus) {
-        micStatus.textContent = `Распознано: ${finalText.trim()}`;
+      } else {
+        logRecognition('⚠️ Теги не найдены', 'info');
       }
     }
   };

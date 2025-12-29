@@ -108,15 +108,19 @@
           </div>
           <div class="form-actions">
             <button id="recommend-button" type="button">Рекомендовать сцену</button>
-            <span class="status" id="recommend-status">Опишите ситуацию — система предложит сцену автоматически.</span>
+            <button id="mic-toggle" type="button" class="secondary">🎙 Микрофон</button>
+            <button id="whisper-toggle" type="button" class="secondary">🧠 Whisper</button>
           </div>
-          <div class="form-actions">
-            <button id="mic-toggle" type="button" class="secondary">🎙 Включить прослушивание</button>
-            <span class="status" id="mic-status">Распознавание речи выключено.</span>
+        </div>
+        
+        <!-- Лента логов распознавания -->
+        <div class="recognition-log-container" style="margin-top: 16px;">
+          <div class="recognition-log-header">
+            <span class="recognition-log-title">📋 Журнал распознавания</span>
+            <button id="recognition-log-clear" type="button" class="secondary small">Очистить</button>
           </div>
-          <div class="form-actions">
-            <button id="whisper-toggle" type="button" class="secondary">🧠 Включить Whisper (эксперимент)</button>
-            <span class="status" id="whisper-status">Whisper выключен.</span>
+          <div id="recognition-log" class="recognition-log" aria-live="polite">
+            <div class="log-entry info">Готово к работе. Нажмите "Микрофон" или "Whisper" для начала.</div>
           </div>
         </div>
       </section>
