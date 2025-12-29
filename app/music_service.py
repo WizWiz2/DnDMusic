@@ -301,15 +301,19 @@ class MusicService:
         """Call AI with raw speech text instead of tags.
         
         This allows the AI to interpret natural language from player
-        conversations and determine the appropriate scene.
+        conversations and generate a UNIQUE search query for each phrase.
+        We intentionally return None for canonical_scene to ensure the
+        AI-generated query is used directly (via fallback path) rather
+        than being replaced by a generic config query.
         """
         try:
             prediction = self._ai_client.recommend_scene_from_text(genre, raw_text)  # type: ignore[union-attr]
         except NeuralTaggerError as exc:
             raise RecommendationUnavailableError(str(exc)) from exc
 
-        canonical_scene = self._canonical_scene_slug(genre, prediction.scene)
-        return prediction, canonical_scene
+        # IMPORTANT: Return None for canonical_scene to force using AI query directly
+        # This ensures "дракон нападает" and "гномы нападают" get different queries
+        return prediction, None
 
     def _canonical_scene_slug(self, genre: str, scene_name: str) -> str | None:
         genre_key = genre.lower()
