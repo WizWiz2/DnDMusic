@@ -134,10 +134,14 @@ class SearchResult(BaseModel):
 
 
 class RecommendationRequest(BaseModel):
-    """Запрос на рекомендацию сцены по тегам."""
+    """Запрос на рекомендацию сцены по тегам или сырому тексту речи."""
 
     genre: str = Field(..., description="Жанр кампании")
-    tags: List[str] = Field(..., min_length=1, description="Набор тегов от детектора событий")
+    tags: List[str] = Field(default_factory=list, description="Набор тегов от детектора событий")
+    raw_text: Optional[str] = Field(
+        None,
+        description="Сырой текст речи для обработки нейросетью (альтернатива tags)",
+    )
 
 
 class RecommendationResult(SearchResult):

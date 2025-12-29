@@ -174,24 +174,40 @@ class MusicService:
 
         return self._config.hysteresis.model_dump()
 
-    def recommend(self, genre: str, tags: Iterable[str]) -> RecommendationResult:
-        # Normalise + sort tags to improve cache hit rate
-        normalized_tags = [str(t).strip().lower() for t in tags if str(t).strip()]
-        normalized_tags.sort()
-        if not normalized_tags:
-            raise RecommendationUnavailableError(
-                "Нужен хотя бы один тег для рекомендации"
+    def recommend(
+        self, genre: str, tags: Iterable[str], raw_text: str | None = None
+    ) -> RecommendationResult:
+        # If raw_text is provided, use AI to extract tags/scene from speech
+        if raw_text and raw_text.strip() and self._ai_client:
+            # Let the AI determine scene from raw speech text
+            normalized_tags = ["speech_input"]  # Marker tag for cache key
+            cache_key_rec: Tuple[str, Tuple[str, ...]] = (
+                genre.lower(),
+                (f"raw:{hash(raw_text.strip())}",),
             )
-        if not self._ai_client:
-            raise RecommendationUnavailableError("Сервис рекомендаций не настроен")
+            cached = self._rec_cache.get(cache_key_rec)
+            if cached:
+                return cached
+            # Use raw text as the prompt for scene recommendation
+            prediction, canonical_scene = self._call_ai_with_text(genre, raw_text.strip())
+        else:
+            # Normalise + sort tags to improve cache hit rate
+            normalized_tags = [str(t).strip().lower() for t in tags if str(t).strip()]
+            normalized_tags.sort()
+            if not normalized_tags:
+                raise RecommendationUnavailableError(
+                    "Нужен хотя бы один тег или raw_text для рекомендации"
+                )
+            if not self._ai_client:
+                raise RecommendationUnavailableError("Сервис рекомендаций не настроен")
 
-        # Check cache before hitting the external AI
-        cache_key_rec: Tuple[str, Tuple[str, ...]] = (genre.lower(), tuple(normalized_tags))
-        cached = self._rec_cache.get(cache_key_rec)
-        if cached:
-            return cached
+            # Check cache before hitting the external AI
+            cache_key_rec = (genre.lower(), tuple(normalized_tags))
+            cached = self._rec_cache.get(cache_key_rec)
+            if cached:
+                return cached
 
-        prediction, canonical_scene = self._call_ai(genre, normalized_tags)
+            prediction, canonical_scene = self._call_ai(genre, normalized_tags)
 
         if canonical_scene:
             base_result = self.search(genre, canonical_scene)
@@ -273,6 +289,22 @@ class MusicService:
     ) -> Tuple[ScenePrediction, str | None]:
         try:
             prediction = self._ai_client.recommend_scene(genre, tags)  # type: ignore[union-attr]
+        except NeuralTaggerError as exc:
+            raise RecommendationUnavailableError(str(exc)) from exc
+
+        canonical_scene = self._canonical_scene_slug(genre, prediction.scene)
+        return prediction, canonical_scene
+
+    def _call_ai_with_text(
+        self, genre: str, raw_text: str
+    ) -> Tuple[ScenePrediction, str | None]:
+        """Call AI with raw speech text instead of tags.
+        
+        This allows the AI to interpret natural language from player
+        conversations and determine the appropriate scene.
+        """
+        try:
+            prediction = self._ai_client.recommend_scene_from_text(genre, raw_text)  # type: ignore[union-attr]
         except NeuralTaggerError as exc:
             raise RecommendationUnavailableError(str(exc)) from exc
 

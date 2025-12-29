@@ -270,6 +270,139 @@ class NeuralTaggerClient:
             return ". ".join(prompt_parts)
         return "Музыкальная сцена"
 
+    def recommend_scene_from_text(self, genre: str, raw_text: str) -> ScenePrediction:
+        """Recommend a scene based on raw speech text from players.
+        
+        This method is optimized for natural language input from tabletop RPG
+        conversations, extracting context and determining the appropriate scene.
+        """
+        genre_text = str(genre).strip()
+        # Build a prompt that explains we're analyzing player speech
+        prompt = self._build_speech_prompt(genre_text, raw_text)
+
+        # Use OpenAI-compatible endpoint if available (best for natural language)
+        if self._is_openai_chat_endpoint(self._endpoint):
+            return self._call_openai_chat_for_speech(self._endpoint, genre_text, raw_text)
+        
+        # Otherwise fall back to standard recommend_scene with extracted keywords
+        keywords = self._extract_keywords_from_speech(raw_text)
+        if keywords:
+            return self.recommend_scene(genre, keywords)
+        
+        # Last resort: treat the whole text as a single tag
+        return self.recommend_scene(genre, [raw_text[:100]])
+
+    @staticmethod
+    def _build_speech_prompt(genre: str, speech_text: str) -> str:
+        """Build prompt for speech-to-scene analysis."""
+        parts = []
+        if genre:
+            parts.append(f"Genre: {genre}")
+        parts.append(f"Player conversation: {speech_text}")
+        return ". ".join(parts)
+
+    def _call_openai_chat_for_speech(
+        self, endpoint: str, genre: str, speech_text: str
+    ) -> ScenePrediction:
+        """Call OpenAI-compatible API with speech analysis prompt."""
+        model = self._extract_oai_model(endpoint)
+        if not model:
+            raise NeuralTaggerError(
+                "Не задана модель для OpenAI-совместимого эндпоинта. "
+                f"Добавьте '?model=...' к URL или переменную {ENV_OAI_MODEL}."
+            )
+
+        url = self._normalize_oai_url(endpoint)
+        sys_prompt = (
+            "You analyze tabletop RPG player conversations and determine the scene type. "
+            "Return ONLY a short English search query for background instrumental music (3-6 words). "
+            "Match the mood: battle scenes = epic action music, tavern = medieval folk, "
+            "exploration = ambient adventure, tension = suspenseful dark, chase = fast-paced. "
+            "Add '-vocals' at the end. No quotes, no punctuation."
+        )
+
+        user_content = f"Genre: {genre}\nPlayer speech: {speech_text}"
+        
+        # Add EN hints
+        en_hints = self._build_en_hints_from_ru(speech_text)
+        if en_hints:
+            user_content += f"\nKeyword hints: {', '.join(en_hints)}"
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": sys_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            "temperature": 0.4,
+            "max_tokens": 32,
+        }
+
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+
+        try:
+            with httpx.Client(timeout=self._timeout, transport=self._transport) as client:
+                resp = client.post(url, json=payload, headers=headers)
+        except httpx.HTTPError as exc:
+            raise NeuralTaggerError(
+                f"Не удалось обратиться к OpenAI-совместимому сервису ({url}): {exc}"
+            ) from exc
+        
+        if resp.status_code != 200:
+            raise NeuralTaggerError(
+                f"OpenAI-совместимый сервис вернул статус {resp.status_code}: {resp.text}"
+            )
+        
+        data = resp.json()
+        try:
+            content = data["choices"][0]["message"]["content"]
+        except Exception as exc:
+            raise NeuralTaggerError(
+                "Ответ OpenAI-совместимого сервиса не содержит результата"
+            ) from exc
+        
+        text = str(content or "").strip()
+        text = " ".join(text.split())
+        if not text:
+            raise NeuralTaggerError("Пустой ответ от генеративной модели")
+        
+        return ScenePrediction(scene=text.lower(), reason=f"Analyzed speech: {speech_text[:50]}...")
+
+    @staticmethod
+    def _extract_keywords_from_speech(text: str) -> list[str]:
+        """Extract RPG-relevant keywords from speech text."""
+        t = text.lower()
+        keywords = []
+        
+        # Battle/combat
+        if any(w in t for w in ["бой", "битв", "атак", "удар", "сраж", "battle", "fight", "attack"]):
+            keywords.append("battle")
+        # Tavern
+        if any(w in t for w in ["таверн", "бар", "трактир", "выпить", "tavern", "inn", "drink"]):
+            keywords.append("tavern")
+        # Exploration
+        if any(w in t for w in ["исслед", "искать", "путь", "дорог", "explore", "search", "travel"]):
+            keywords.append("exploration")
+        # Tension
+        if any(w in t for w in ["опасн", "страш", "жут", "ловушк", "danger", "trap", "scary"]):
+            keywords.append("tension")
+        # Chase
+        if any(w in t for w in ["погон", "беж", "преслед", "chase", "run", "escape"]):
+            keywords.append("chase")
+        # Dragons
+        if any(w in t for w in ["дракон", "dragon"]):
+            keywords.append("dragons")
+        # Ritual/magic
+        if any(w in t for w in ["ритуал", "магия", "заклин", "ritual", "magic", "spell"]):
+            keywords.append("ritual")
+        # Rest/camp
+        if any(w in t for w in ["отдых", "лагер", "костер", "rest", "camp", "fire"]):
+            keywords.append("rest")
+        
+        return keywords
+
     # --- OpenAI-compatible (Groq, LM Studio, OpenRouter, Ollama via proxy) ---
 
     def _is_openai_chat_endpoint(self, url: str) -> bool:

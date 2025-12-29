@@ -228,7 +228,7 @@ async def recommend(
     service: MusicService = Depends(get_service),
 ) -> RecommendationResult:
     try:
-        return service.recommend(request.genre, request.tags)
+        return service.recommend(request.genre, request.tags, request.raw_text)
     except GenreNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RecommendationUnavailableError as exc:
