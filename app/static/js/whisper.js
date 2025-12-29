@@ -15,9 +15,11 @@ let isReady = false;
 let isRecording = false;
 let mediaRecorder = null;
 let audioChunks = [];
+let lastRecommendTime = 0; // Debounce: prevent frequent scene changes
 
 // Configuration
 const CHUNK_DURATION_MS = 8000; // Record 8 seconds at a time
+const DEBOUNCE_MS = 30000; // 30 seconds between scene changes
 
 /**
  * Initialize Whisper worker
@@ -264,6 +266,15 @@ export function stopRecording() {
  * @param {string} text - Transcribed speech text
  */
 async function sendToBackend(text) {
+  // Debounce: prevent rapid scene changes
+  const now = Date.now();
+  const elapsed = now - lastRecommendTime;
+  if (elapsed < DEBOUNCE_MS) {
+    const remaining = Math.ceil((DEBOUNCE_MS - elapsed) / 1000);
+    logRecognition(`⏳ Антидребезг: подожди ${remaining} сек`, 'info');
+    return;
+  }
+
   const genreSelect = document.getElementById('genre-select');
   const genre = genreSelect?.value || 'fantasy';
 
@@ -284,6 +295,7 @@ async function sendToBackend(text) {
       const result = await response.json();
       logRecognition(`✅ AI рекомендует: ${result.scene}`, 'output');
       runAutoRecommend([result.scene]);
+      lastRecommendTime = Date.now(); // Update debounce timer
     } else {
       const error = await response.text();
       logRecognition(`❌ API ошибка: ${error.substring(0, 100)}`, 'error');

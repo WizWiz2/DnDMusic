@@ -235,6 +235,8 @@ function createOrGetPlayer() {
       onReady: () => {
         try {
           ytPlayer.setVolume(lastSetVolume);
+          // Unmute player - browsers may mute autoplay by default
+          ytPlayer.unMute();
         } catch (error) {
           console.warn('[YouTubePlayer] Unable to preset volume', error);
         }
@@ -273,12 +275,12 @@ function createOrGetPlayer() {
           event.data === YTState.ENDED
             ? 'info'
             : event.data === YTState.PAUSED
-            ? 'info'
-            : event.data === YTState.BUFFERING
-            ? 'debug'
-            : event.data === YTState.PLAYING
-            ? 'success'
-            : 'debug',
+              ? 'info'
+              : event.data === YTState.BUFFERING
+                ? 'debug'
+                : event.data === YTState.PLAYING
+                  ? 'success'
+                  : 'debug',
         );
         switch (event.data) {
           case YTState.PLAYING:
@@ -405,8 +407,8 @@ function createOrGetPlayer() {
 
         const manualList = Array.isArray(lastPlaylistRequest?.manualVideoIds)
           ? lastPlaylistRequest.manualVideoIds
-              .map((id) => String(id || '').trim())
-              .filter((id) => id.length > 0)
+            .map((id) => String(id || '').trim())
+            .filter((id) => id.length > 0)
           : [];
         const manualListInitialLength = manualList.length;
         let manualListRemainingLength = manualList.length;
@@ -493,22 +495,22 @@ function createOrGetPlayer() {
 
         const sanitizedRequest = lastPlaylistRequest
           ? (() => {
-              const desiredVolNumber = Number(lastPlaylistRequest.desiredVol);
-              const crossfadeNumber = Number(lastPlaylistRequest.crossfadeSec);
-              const searchQueryValue =
-                typeof lastPlaylistRequest.searchQuery === 'string'
-                  ? collapseWhitespace(lastPlaylistRequest.searchQuery)
-                  : '';
-              const payload = {
-                query: String(lastPlaylistRequest.query ?? ''),
-                desiredVol: Number.isFinite(desiredVolNumber) ? desiredVolNumber : null,
-                crossfadeSec: Number.isFinite(crossfadeNumber) ? crossfadeNumber : null,
-              };
-              if (searchQueryValue) {
-                payload.searchQuery = searchQueryValue;
-              }
-              return payload;
-            })()
+            const desiredVolNumber = Number(lastPlaylistRequest.desiredVol);
+            const crossfadeNumber = Number(lastPlaylistRequest.crossfadeSec);
+            const searchQueryValue =
+              typeof lastPlaylistRequest.searchQuery === 'string'
+                ? collapseWhitespace(lastPlaylistRequest.searchQuery)
+                : '';
+            const payload = {
+              query: String(lastPlaylistRequest.query ?? ''),
+              desiredVol: Number.isFinite(desiredVolNumber) ? desiredVolNumber : null,
+              crossfadeSec: Number.isFinite(crossfadeNumber) ? crossfadeNumber : null,
+            };
+            if (searchQueryValue) {
+              payload.searchQuery = searchQueryValue;
+            }
+            return payload;
+          })()
           : null;
         const report = {
           errorCode,
@@ -637,8 +639,8 @@ function performPlaylistLoad(player, request) {
   const searchQuery = providedSearchQuery
     ? providedSearchQuery
     : sanitizedQuery
-    ? sanitizedQuery
-    : normalizedQuery;
+      ? sanitizedQuery
+      : normalizedQuery;
 
   const normalizedRequest = {
     query: normalizedQuery,
@@ -651,8 +653,8 @@ function performPlaylistLoad(player, request) {
         : '',
     manualVideoIds: Array.isArray(request.manualVideoIds)
       ? request.manualVideoIds
-          .map((id) => String(id || '').trim())
-          .filter((id) => id.length > 0)
+        .map((id) => String(id || '').trim())
+        .filter((id) => id.length > 0)
       : [],
   };
 
@@ -859,8 +861,8 @@ export function playSearchOnYouTube(result, meta) {
     typeof result === 'string'
       ? { query: result }
       : result && typeof result === 'object'
-      ? { ...result }
-      : { query: '' };
+        ? { ...result }
+        : { query: '' };
 
   const rawQuery = typeof payload.query === 'string' ? payload.query : '';
   const query = collapseWhitespace(rawQuery);
@@ -881,8 +883,8 @@ export function playSearchOnYouTube(result, meta) {
     manualVideoIds.length
       ? 'manual_playlist'
       : playlistId
-      ? `playlist:${playlistId}`
-      : searchQuery;
+        ? `playlist:${playlistId}`
+        : searchQuery;
   lastMeta = meta || null;
 
   ensureYouTubeApiLoaded(() => {
