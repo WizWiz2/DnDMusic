@@ -314,11 +314,13 @@ class NeuralTaggerClient:
 
         url = self._normalize_oai_url(endpoint)
         sys_prompt = (
-            "You analyze tabletop RPG player conversations and determine the scene type. "
-            "Return ONLY a short English search query for background instrumental music (3-6 words). "
-            "Match the mood: battle scenes = epic action music, tavern = medieval folk, "
-            "exploration = ambient adventure, tension = suspenseful dark, chase = fast-paced. "
-            "Add '-vocals' at the end. No quotes, no punctuation."
+            "You analyze tabletop RPG player conversations and create UNIQUE YouTube music search queries. "
+            "CRITICAL: Include specific creatures/weapons/locations from the speech in your query! "
+            "Examples: 'dragon attack' → 'dragon battle epic orchestral', "
+            "'goblins ambush' → 'goblin horde attack drums', "
+            "'orcs with axes' → 'orc warriors battle percussion', "
+            "'tavern fight' → 'medieval tavern brawl fiddle'. "
+            "Return ONLY 3-6 English words. Add '-vocals' at the end. No quotes."
         )
 
         user_content = f"Genre: {genre}\nPlayer speech: {speech_text}"
@@ -334,7 +336,7 @@ class NeuralTaggerClient:
                 {"role": "system", "content": sys_prompt},
                 {"role": "user", "content": user_content},
             ],
-            "temperature": 0.4,
+            "temperature": 0.7,  # Higher temperature for more variety
             "max_tokens": 32,
         }
 
@@ -523,18 +525,39 @@ class NeuralTaggerClient:
 
         # RU → EN tag keywords (substring-based)
         mapping: List[tuple[List[str], List[str]]] = [
-            (["драка", "бой", "битва", "сраж"], ["battle"]),
+            # Combat
+            (["драка", "бой", "битва", "сраж", "напад", "атак"], ["battle", "combat"]),
+            # Creatures
             (["дракон", "драко"], ["dragon"]),
+            (["гном"], ["dwarf", "dwarven"]),
+            (["орк", "орков"], ["orc"]),
+            (["гоблин"], ["goblin"]),
+            (["эльф"], ["elf", "elven"]),
+            (["тролл"], ["troll"]),
+            (["огр"], ["ogre"]),
+            (["скелет", "нежит", "зомби", "некро"], ["undead", "dark"]),
+            (["волк"], ["wolf"]),
+            (["медвед"], ["bear"]),
+            (["великан", "гигант"], ["giant"]),
+            (["демон", "бес"], ["demon", "infernal"]),
+            # Locations
             (["таверн"], ["tavern", "medieval"]),
-            (["погон"], ["chase", "dnb"]),
-            (["стелс", "скрыт", "шпион"], ["stealth"]),
-            (["ритуал", "обряд"], ["ritual"]),
-            (["исслед", "развед"], ["exploration", "ambient"]),
             (["трактир", "бар"], ["bar", "lounge"]),
             (["лес", "дебр"], ["forest"]),
             (["пещер", "подзем", "данж"], ["dungeon"]),
             (["город"], ["city"]),
+            (["замок", "крепост"], ["castle"]),
+            (["гор", "скал"], ["mountain"]),
+            (["болот"], ["swamp"]),
+            # Actions
+            (["погон"], ["chase", "fast"]),
+            (["стелс", "скрыт", "шпион"], ["stealth"]),
+            (["ритуал", "обряд", "колдов"], ["ritual", "magic"]),
+            (["исслед", "развед"], ["exploration", "ambient"]),
+            # Mood
             (["страш", "жутк", "кошмар"], ["creepy", "dark"]),
+            (["мирн", "спокой", "отдых"], ["calm", "peaceful"]),
+            (["напряж", "тревог"], ["tension", "suspense"]),
         ]
         for triggers, words in mapping:
             if any(t in text for t in triggers):
