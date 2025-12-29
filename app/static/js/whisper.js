@@ -31,8 +31,8 @@ export async function initWhisper() {
     isLoading = true;
     logRecognition('🧠 Запускаем Whisper Worker...', 'info');
 
-    // Create worker
-    worker = new Worker('/static/js/whisper-worker.js');
+    // Create worker as Module Worker for ES imports
+    worker = new Worker('/static/js/whisper-worker.js', { type: 'module' });
 
     // Handle messages from worker
     worker.onmessage = handleWorkerMessage;

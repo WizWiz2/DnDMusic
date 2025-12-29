@@ -5,9 +5,6 @@
  * Communicates with main thread via postMessage.
  */
 
-// Import Transformers.js
-importScripts('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
-
 // State
 let transcriber = null;
 let isLoading = false;
@@ -25,8 +22,8 @@ async function initModel() {
     self.postMessage({ type: 'status', message: 'loading', model: WHISPER_MODEL });
 
     try {
-        // Use pipeline from Transformers.js
-        const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+        // Dynamic import works in workers
+        const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js');
 
         transcriber = await pipeline('automatic-speech-recognition', WHISPER_MODEL, {
             quantized: true,
