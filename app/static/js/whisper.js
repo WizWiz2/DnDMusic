@@ -1,7 +1,7 @@
 /**
- * Whisper integration via Transformers.js
+ * Whisper integration via Web Worker + Transformers.js
  * 
- * Provides browser-based speech-to-text using OpenAI's Whisper model.
+ * Runs Whisper model in a separate thread to avoid blocking the main UI.
  * Falls back to Web Speech API if Whisper is not available.
  */
 
@@ -9,41 +9,50 @@ import { dom, logRecognition } from './state.js';
 import { runAutoRecommend } from './search.js';
 
 // State
-let transcriber = null;
+let worker = null;
 let isLoading = false;
+let isReady = false;
 let isRecording = false;
 let mediaRecorder = null;
 let audioChunks = [];
 
 // Configuration
-const WHISPER_MODEL = 'Xenova/whisper-small'; // ~240MB, better Russian support
 const CHUNK_DURATION_MS = 8000; // Record 8 seconds at a time
 
 /**
- * Initialize Whisper model asynchronously
+ * Initialize Whisper worker
  * @returns {Promise<boolean>} True if initialization succeeded
  */
 export async function initWhisper() {
-  if (transcriber) return true;
+  if (isReady) return true;
   if (isLoading) return false;
-
-  const { whisperStatus } = dom;
 
   try {
     isLoading = true;
-    logRecognition('🧠 Загружаем Whisper-модель (~240MB, первый раз долго)...', 'info');
+    logRecognition('🧠 Запускаем Whisper Worker...', 'info');
 
-    // Dynamic import of Transformers.js
-    const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+    // Create worker
+    worker = new Worker('/static/js/whisper-worker.js');
 
-    transcriber = await pipeline('automatic-speech-recognition', WHISPER_MODEL, {
-      quantized: true, // Use quantized model for faster loading
-    });
+    // Handle messages from worker
+    worker.onmessage = handleWorkerMessage;
+    worker.onerror = (error) => {
+      logRecognition(`❌ Worker error: ${error.message}`, 'error');
+    };
 
-    logRecognition('✅ Whisper готов к работе!', 'output');
-    return true;
+    // Wait for worker to be ready (with timeout)
+    const ready = await waitForWorkerReady(60000); // 60 sec timeout for model loading
+
+    if (ready) {
+      isReady = true;
+      logRecognition('✅ Whisper готов к работе!', 'output');
+      return true;
+    } else {
+      logRecognition('❌ Таймаут загрузки Whisper', 'error');
+      return false;
+    }
   } catch (error) {
-    console.error('Failed to load Whisper:', error);
+    console.error('Failed to init Whisper worker:', error);
     logRecognition(`❌ Whisper недоступен: ${error.message}`, 'error');
     return false;
   } finally {
@@ -52,43 +61,77 @@ export async function initWhisper() {
 }
 
 /**
- * Check if Whisper is ready
+ * Wait for worker to signal ready state
  */
-export function isWhisperReady() {
-  return transcriber !== null;
+function waitForWorkerReady(timeoutMs) {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(false), timeoutMs);
+
+    const checkReady = (event) => {
+      const { type, message, progress, status } = event.data;
+
+      if (type === 'status' && message === 'loading') {
+        logRecognition('🧠 Загружаем Whisper-модель (~240MB)...', 'info');
+      }
+
+      if (type === 'progress' && progress !== undefined) {
+        const pct = Math.round(progress);
+        if (pct > 0 && pct % 20 === 0) { // Log every 20%
+          logRecognition(`📥 Загрузка: ${pct}%`, 'info');
+        }
+      }
+
+      if (type === 'status' && message === 'ready') {
+        clearTimeout(timeout);
+        worker.removeEventListener('message', checkReady);
+        resolve(true);
+      }
+
+      if (type === 'error') {
+        clearTimeout(timeout);
+        worker.removeEventListener('message', checkReady);
+        logRecognition(`❌ Ошибка: ${event.data.message}`, 'error');
+        resolve(false);
+      }
+    };
+
+    worker.addEventListener('message', checkReady);
+  });
 }
 
 /**
- * Transcribe audio blob using Whisper
- * @param {Blob} audioBlob - Audio data to transcribe
- * @returns {Promise<string|null>} Transcribed text or null on failure
+ * Handle messages from worker
  */
-export async function transcribeAudio(audioBlob) {
-  if (!transcriber) {
-    console.warn('Whisper not initialized');
-    return null;
+function handleWorkerMessage(event) {
+  const { type, text, message } = event.data;
+
+  switch (type) {
+    case 'status':
+      if (message === 'transcribing') {
+        logRecognition('🔄 Распознаём речь (Whisper)...', 'info');
+      }
+      break;
+
+    case 'result':
+      if (text) {
+        logRecognition(`📝 Whisper: "${text}"`, 'input');
+        sendToBackend(text);
+      } else {
+        logRecognition('⚠️ Whisper: пустой результат', 'info');
+      }
+      break;
+
+    case 'error':
+      logRecognition(`❌ Whisper ошибка: ${message}`, 'error');
+      break;
   }
+}
 
-  try {
-    // Convert WebM to Float32Array using AudioContext
-    const audioData = await convertBlobToAudioData(audioBlob);
-    if (!audioData) {
-      console.error('Failed to convert audio');
-      return null;
-    }
-
-    // Transcribe with proper audio format
-    const result = await transcriber(audioData, {
-      language: 'russian',
-      task: 'transcribe',
-    });
-
-    console.log('Whisper result:', result);
-    return result?.text?.trim() || null;
-  } catch (error) {
-    console.error('Transcription failed:', error);
-    return null;
-  }
+/**
+ * Check if Whisper is ready
+ */
+export function isWhisperReady() {
+  return isReady && worker !== null;
 }
 
 /**
@@ -132,13 +175,11 @@ async function convertBlobToAudioData(blob) {
 export async function startRecording() {
   if (isRecording) return;
 
-  const { whisperStatus } = dom;
-
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         channelCount: 1,
-        sampleRate: 16000, // Whisper expects 16kHz
+        sampleRate: 16000,
       }
     });
 
@@ -160,16 +201,12 @@ export async function startRecording() {
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       audioChunks = [];
 
-      logRecognition('🔄 Распознаём речь (Whisper)...', 'info');
+      // Convert to Float32Array
+      const audioData = await convertBlobToAudioData(audioBlob);
 
-      const text = await transcribeAudio(audioBlob);
-
-      if (text) {
-        logRecognition(`📝 Whisper вход: "${text}"`, 'input');
-        // Send to backend for scene recommendation
-        await sendToBackend(text);
-      } else {
-        logRecognition('⚠️ Whisper: не удалось распознать речь', 'error');
+      if (audioData && worker) {
+        // Send to worker for transcription (non-blocking!)
+        worker.postMessage({ type: 'transcribe', audioData });
       }
 
       // Continue recording if still active
@@ -196,7 +233,6 @@ function startNextChunk() {
 
   mediaRecorder.start();
 
-  // Stop after CHUNK_DURATION_MS to process
   setTimeout(() => {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
       mediaRecorder.stop();
@@ -232,6 +268,8 @@ async function sendToBackend(text) {
   const genre = genreSelect?.value || 'fantasy';
 
   try {
+    logRecognition(`🚀 Отправляем в AI: "${text.substring(0, 50)}..."`, 'decision');
+
     const response = await fetch('/api/recommend', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -244,43 +282,42 @@ async function sendToBackend(text) {
 
     if (response.ok) {
       const result = await response.json();
-      // Trigger UI update with the recommendation
+      logRecognition(`✅ AI рекомендует: ${result.scene}`, 'output');
       runAutoRecommend([result.scene]);
+    } else {
+      const error = await response.text();
+      logRecognition(`❌ API ошибка: ${error.substring(0, 100)}`, 'error');
     }
   } catch (error) {
     console.error('Failed to send to backend:', error);
+    logRecognition(`❌ Сетевая ошибка: ${error.message}`, 'error');
   }
 }
 
 /**
- * Initialize Whisper toggle button
+ * Toggle Whisper recording (for UI button)
  */
 export function initWhisperToggle() {
-  const { whisperToggle, whisperStatus } = dom;
+  const { whisperToggle } = dom;
   if (!whisperToggle) return;
 
   whisperToggle.addEventListener('click', async () => {
     if (isRecording) {
       stopRecording();
-      whisperToggle.textContent = '🎤 Включить Whisper';
-      return;
-    }
-
-    // Try to initialize Whisper first
-    const ready = await initWhisper();
-
-    if (ready) {
-      await startRecording();
-      whisperToggle.textContent = '⏹ Остановить Whisper';
+      whisperToggle.textContent = '🧠 Whisper';
     } else {
-      // Fallback message
-      if (whisperStatus) {
-        whisperStatus.textContent = 'Whisper недоступен. Используйте кнопку микрофона для Web Speech API.';
+      // Initialize if not ready
+      if (!isReady) {
+        whisperToggle.textContent = '⏳ Загрузка...';
+        const ok = await initWhisper();
+        if (!ok) {
+          whisperToggle.textContent = '🧠 Whisper';
+          return;
+        }
       }
+
+      await startRecording();
+      whisperToggle.textContent = '⏹ Стоп Whisper';
     }
   });
-
-  if (whisperStatus) {
-    whisperStatus.textContent = 'Whisper: нажмите кнопку для активации.';
-  }
 }
