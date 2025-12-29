@@ -10,7 +10,7 @@ function extractTags(text) {
   const t = String(text || '').toLowerCase();
   const tags = new Set();
   // Battle/combat (убираем \b для кириллицы - не работает с Unicode)
-  if (/(бой|битв|схватк|атак|удар|напал|сраж|battle|attack|fight|combat)/.test(t)) tags.add('battle');
+  if (/(бой|битв|схватк|атак|удар|напад|врыв|сраж|battle|attack|fight|combat)/.test(t)) tags.add('battle');
   // Tavern/inn
   if (/(таверн|бар|трактир|inn|tavern|drink|ale|пиво)/.test(t)) tags.add('tavern');
   // Exploration
