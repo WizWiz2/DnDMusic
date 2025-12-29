@@ -525,9 +525,12 @@ class NeuralTaggerClient:
 
         # RU → EN tag keywords (substring-based)
         mapping: List[tuple[List[str], List[str]]] = [
-            # Combat
-            (["драка", "бой", "битва", "сраж", "напад", "атак"], ["battle", "combat"]),
-            # Creatures
+            # === COMBAT ===
+            (["драка", "бой", "битва", "сраж", "напад", "атак", "удар"], ["battle", "combat"]),
+            (["перестрел", "стрельб"], ["shootout", "gunfire"]),
+            (["взрыв"], ["explosion"]),
+            
+            # === FANTASY CREATURES ===
             (["дракон", "драко"], ["dragon"]),
             (["гном"], ["dwarf", "dwarven"]),
             (["орк", "орков"], ["orc"]),
@@ -540,24 +543,91 @@ class NeuralTaggerClient:
             (["медвед"], ["bear"]),
             (["великан", "гигант"], ["giant"]),
             (["демон", "бес"], ["demon", "infernal"]),
-            # Locations
+            (["вампир"], ["vampire"]),
+            (["оборот"], ["werewolf"]),
+            (["ведьм", "колдун"], ["witch", "sorcerer"]),
+            (["призрак", "дух", "привиден"], ["ghost", "spirit"]),
+            
+            # === CYBERPUNK ===
+            (["хакер", "взлом"], ["hacker", "cyber"]),
+            (["нейро", "импл"], ["neural", "cybernetic"]),
+            (["корпор"], ["corporate"]),
+            (["неон"], ["neon", "synthwave"]),
+            (["дрон"], ["drone"]),
+            (["андроид", "киборг"], ["android", "cyborg"]),
+            
+            # === SCI-FI ===
+            (["космос", "звезд", "галакт"], ["space", "cosmic"]),
+            (["корабл", "звездол"], ["spaceship", "starship"]),
+            (["пришел", "инопланет", "ксено"], ["alien", "extraterrestrial"]),
+            (["робот", "мех"], ["robot", "mech"]),
+            (["лазер", "бластер"], ["laser", "blaster"]),
+            (["станци", "орбит"], ["station", "orbital"]),
+            (["аномал"], ["anomaly", "mysterious"]),
+            
+            # === HORROR ===
+            (["ужас", "кошмар", "жуть"], ["horror", "nightmare"]),
+            (["культ", "секта"], ["cult", "occult"]),
+            (["монстр", "чудовищ"], ["monster", "creature"]),
+            (["кров", "мясо"], ["blood", "gore"]),
+            (["темнот", "мрак"], ["darkness", "shadow"]),
+            
+            # === POST-APOCALYPTIC ===
+            (["пустош", "радиац"], ["wasteland", "radioactive"]),
+            (["рейдер", "бандит"], ["raider", "bandit"]),
+            (["мутант"], ["mutant"]),
+            (["бункер", "убежищ"], ["bunker", "shelter"]),
+            (["выжива"], ["survival"]),
+            
+            # === STEAMPUNK ===
+            (["паров", "механ"], ["steam", "mechanical"]),
+            (["дирижабл", "аэрост"], ["airship", "dirigible"]),
+            (["шестерн", "часов"], ["clockwork", "gears"]),
+            (["викториан"], ["victorian"]),
+            
+            # === PIRATE ===
+            (["пират", "корсар"], ["pirate", "corsair"]),
+            (["море", "океан", "волн"], ["sea", "ocean"]),
+            (["остров", "сокровищ"], ["island", "treasure"]),
+            (["шторм", "буря"], ["storm", "tempest"]),
+            (["абордаж"], ["boarding", "naval"]),
+            
+            # === WILD WEST ===
+            (["ковбой", "шериф"], ["cowboy", "sheriff"]),
+            (["салун"], ["saloon", "western"]),
+            (["дуэль"], ["duel", "showdown"]),
+            (["прерия", "каньон"], ["prairie", "canyon"]),
+            (["бандит", "грабит"], ["outlaw", "bandit"]),
+            
+            # === LOCATIONS ===
             (["таверн"], ["tavern", "medieval"]),
-            (["трактир", "бар"], ["bar", "lounge"]),
-            (["лес", "дебр"], ["forest"]),
-            (["пещер", "подзем", "данж"], ["dungeon"]),
-            (["город"], ["city"]),
-            (["замок", "крепост"], ["castle"]),
-            (["гор", "скал"], ["mountain"]),
-            (["болот"], ["swamp"]),
-            # Actions
-            (["погон"], ["chase", "fast"]),
-            (["стелс", "скрыт", "шпион"], ["stealth"]),
+            (["трактир", "бар", "клуб"], ["bar", "lounge", "club"]),
+            (["лес", "дебр", "чащ"], ["forest", "woods"]),
+            (["пещер", "подзем", "данж"], ["dungeon", "cave"]),
+            (["город", "мегапол"], ["city", "urban"]),
+            (["замок", "крепост"], ["castle", "fortress"]),
+            (["гор", "скал"], ["mountain", "rocky"]),
+            (["болот"], ["swamp", "marsh"]),
+            (["пустын"], ["desert"]),
+            (["храм", "святил"], ["temple", "shrine"]),
+            (["лаборатор"], ["laboratory", "lab"]),
+            (["завод", "фабрик"], ["factory", "industrial"]),
+            
+            # === ACTIONS ===
+            (["погон", "преслед"], ["chase", "pursuit"]),
+            (["побег", "бежать"], ["escape", "fleeing"]),
+            (["стелс", "скрыт", "красть"], ["stealth", "sneaking"]),
             (["ритуал", "обряд", "колдов"], ["ritual", "magic"]),
-            (["исслед", "развед"], ["exploration", "ambient"]),
-            # Mood
-            (["страш", "жутк", "кошмар"], ["creepy", "dark"]),
+            (["исслед", "развед", "поиск"], ["exploration", "searching"]),
+            (["переговор", "торг"], ["negotiation", "dialogue"]),
+            
+            # === MOOD ===
+            (["страш", "жутк"], ["creepy", "eerie"]),
             (["мирн", "спокой", "отдых"], ["calm", "peaceful"]),
             (["напряж", "тревог"], ["tension", "suspense"]),
+            (["празд", "весель"], ["celebration", "festive"]),
+            (["грусть", "печаль", "траур"], ["sad", "melancholy"]),
+            (["эпич", "героич"], ["epic", "heroic"]),
         ]
         for triggers, words in mapping:
             if any(t in text for t in triggers):
