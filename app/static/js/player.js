@@ -227,8 +227,8 @@ function createOrGetPlayer() {
     : 'https://www.youtube.com';
 
   ytPlayer = new YT.Player('player', {
-    height: '100%',
-    width: '100%',
+    height: '390',
+    width: '640',
     playerVars,
     host,
     events: {
