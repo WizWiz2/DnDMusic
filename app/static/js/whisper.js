@@ -76,18 +76,58 @@ export async function transcribeAudio(audioBlob) {
   }
 
   try {
-    // Convert blob to array buffer
-    const arrayBuffer = await audioBlob.arrayBuffer();
+    // Convert WebM to Float32Array using AudioContext
+    const audioData = await convertBlobToAudioData(audioBlob);
+    if (!audioData) {
+      console.error('Failed to convert audio');
+      return null;
+    }
 
-    // Transcribe
-    const result = await transcriber(arrayBuffer, {
-      language: 'russian', // Default to Russian for DnD sessions
+    // Transcribe with proper audio format
+    const result = await transcriber(audioData, {
+      language: 'russian',
       task: 'transcribe',
     });
 
+    console.log('Whisper result:', result);
     return result?.text?.trim() || null;
   } catch (error) {
     console.error('Transcription failed:', error);
+    return null;
+  }
+}
+
+/**
+ * Convert audio blob to Float32Array at 16kHz for Whisper
+ */
+async function convertBlobToAudioData(blob) {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      sampleRate: 16000,
+    });
+
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Get mono channel
+    const channelData = audioBuffer.getChannelData(0);
+
+    // Resample to 16kHz if needed
+    if (audioBuffer.sampleRate !== 16000) {
+      const ratio = audioBuffer.sampleRate / 16000;
+      const newLength = Math.round(channelData.length / ratio);
+      const resampled = new Float32Array(newLength);
+      for (let i = 0; i < newLength; i++) {
+        resampled[i] = channelData[Math.round(i * ratio)];
+      }
+      await audioContext.close();
+      return resampled;
+    }
+
+    await audioContext.close();
+    return channelData;
+  } catch (error) {
+    console.error('Audio conversion failed:', error);
     return null;
   }
 }
