@@ -2,6 +2,10 @@
 
 **Демо:** https://dndmusic-hpwy.onrender.com/
 
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green?logo=fastapi&logoColor=white)
+![Render](https://img.shields.io/badge/Deploy-Render-purple?logo=render&logoColor=white)
+
 Автономный бэкенд-сервис для подбора музыкальных плейлистов под сцену и жанр ролевой игры. Реализует API из технического задания, поддерживает нейросетевой выбор сцен и может использоваться фронтендом как источник подходящих ссылок на музыку.
 
 ## Возможности
@@ -77,7 +81,7 @@ POST /api/recommend
   ],
   "tags": ["battle", "dragons"],
   "confidence": 0.91,
-  "reason": "stub",
+  "reason": "Detected combat keywords and dragon references in player conversation",
   "hysteresis": {
     "min_confidence": 0.6,
     "window_sec": 30,
