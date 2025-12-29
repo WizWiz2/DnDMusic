@@ -62,8 +62,12 @@ export function formatLabel(value) {
  * @param {'info'|'input'|'output'|'error'|'decision'} type - Log type
  */
 export function logRecognition(message, type = 'info') {
-  const log = dom.recognitionLog;
-  if (!log) return;
+  // Get element each time - DOM might not be ready at module load
+  const log = document.getElementById('recognition-log');
+  if (!log) {
+    console.log('[Recognition]', type, message);
+    return;
+  }
 
   const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const entry = document.createElement('div');
@@ -73,11 +77,12 @@ export function logRecognition(message, type = 'info') {
   log.scrollTop = log.scrollHeight;
 }
 
-// Clear recognition log button
-if (dom.recognitionLogClear) {
-  dom.recognitionLogClear.addEventListener('click', () => {
-    if (dom.recognitionLog) {
-      dom.recognitionLog.innerHTML = '<div class="log-entry info">Журнал очищен.</div>';
+// Clear recognition log button - use event delegation
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'recognition-log-clear') {
+    const log = document.getElementById('recognition-log');
+    if (log) {
+      log.innerHTML = '<div class="log-entry info">Журнал очищен.</div>';
     }
-  });
-}
+  }
+});
