@@ -202,7 +202,7 @@
         white-space: pre-wrap;
       }
 
-      .player-log-entry + .player-log-entry {
+      .player-log-entry+.player-log-entry {
         margin-top: 4px;
       }
 
@@ -454,4 +454,39 @@
         color: #7c3aed;
         font-weight: 600;
       }
-    
+
+      /* Collapsible technical details */
+      details.result-details {
+        margin-top: 16px;
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        padding-top: 12px;
+      }
+
+      details.result-details summary {
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        padding: 8px 0;
+        list-style: none;
+      }
+
+      details.result-details summary::-webkit-details-marker {
+        display: none;
+      }
+
+      details.result-details summary::before {
+        content: "▶ ";
+        font-size: 0.7rem;
+        margin-right: 6px;
+      }
+
+      details.result-details[open] summary::before {
+        content: "▼ ";
+      }
+
+      details.result-details h4 {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin: 0 0 6px;
+      }
