@@ -18,8 +18,8 @@ let audioChunks = [];
 let lastRecommendTime = 0; // Debounce: prevent frequent scene changes
 
 // Configuration
-const CHUNK_DURATION_MS = 8000; // Record 8 seconds at a time
-const DEBOUNCE_MS = 30000; // 30 seconds between scene changes
+const CHUNK_DURATION_MS = 30000; // Record 30 seconds for better context
+const DEBOUNCE_MS = 180000; // 3 minutes between scene changes to save API quota
 
 /**
  * Initialize Whisper worker

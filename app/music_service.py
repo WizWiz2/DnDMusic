@@ -94,18 +94,12 @@ class MusicService:
             youtube_video_ids=scene_config.youtube_video_ids,
         )
         # If no manual list provided, try enriching with embeddable YouTube results
+        # NOTE: Only 1 API call to save quota (each call = 100 units, limit 10,000/day)
         if not result.youtube_video_ids and self._yt is not None:
             try:
-                ids = self._yt.search_embeddable_video_ids(result.query, max_results=15)
-                # Fallback: if the query is too restrictive, try a sanitized variant
-                if not ids:
-                    cleaned = self._sanitize_query_for_youtube(result.query)
-                    if cleaned and cleaned != result.query:
-                        ids = self._yt.search_embeddable_video_ids(cleaned, max_results=15)
-                # Last-resort: bias to background/copyright-safe phrasing
-                if not ids:
-                    alt = f"{self._sanitize_query_for_youtube(result.query)} background music no copyright"
-                    ids = self._yt.search_embeddable_video_ids(alt.strip(), max_results=15)
+                # Single query attempt - no fallbacks to save quota
+                cleaned = self._sanitize_query_for_youtube(result.query)
+                ids = self._yt.search_embeddable_video_ids(cleaned or result.query, max_results=10)
                 if ids:
                     result.youtube_video_ids = ids
             except YouTubeApiError:
@@ -238,16 +232,12 @@ class MusicService:
             )
             query = prediction.scene
             # Enrich dynamic result using YouTube Data API when available
+            # NOTE: Only 1 API call to save quota (each call = 100 units, limit 10,000/day)
             if self._yt is not None:
                 try:
-                    ids = self._yt.search_embeddable_video_ids(query, max_results=15)
-                    if not ids:
-                        cleaned = self._sanitize_query_for_youtube(query)
-                        if cleaned and cleaned != query:
-                            ids = self._yt.search_embeddable_video_ids(cleaned, max_results=15)
-                    if not ids:
-                        alt = f"{self._sanitize_query_for_youtube(query)} background music no copyright"
-                        ids = self._yt.search_embeddable_video_ids(alt.strip(), max_results=15)
+                    # Single query attempt - no fallbacks to save quota
+                    cleaned = self._sanitize_query_for_youtube(query)
+                    ids = self._yt.search_embeddable_video_ids(cleaned or query, max_results=10)
                     if ids:
                         base_result.youtube_video_ids = ids
                 except YouTubeApiError:
