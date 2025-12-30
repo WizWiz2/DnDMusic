@@ -16,9 +16,21 @@
         box-sizing: border-box;
       }
 
+      html {
+        height: 100%;
+        overflow: hidden;
+        /* Prevent html scrolling */
+      }
+
       body {
         margin: 0;
-        min-height: 100vh;
+        height: 100%;
+        /* Fill html */
+        width: 100%;
+        overflow: hidden;
+        /* Prevent body scrolling */
+        display: flex;
+        flex-direction: column;
         color: var(--text-primary);
         background: linear-gradient(180deg, var(--bg-start), var(--bg-middle), var(--bg-end));
       }
@@ -28,19 +40,19 @@
       }
 
       header {
-        position: sticky;
-        top: 0;
+        flex-shrink: 0;
         backdrop-filter: blur(14px);
         background: rgba(255, 255, 255, 0.78);
         border-bottom: 1px solid rgba(255, 255, 255, 0.65);
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
         z-index: 10;
+        padding: 0;
       }
 
       header .wrap,
       main,
       footer {
-        width: min(1180px, 100%);
+        width: min(1280px, 100%);
         margin: 0 auto;
         padding: 12px 16px;
       }
@@ -69,15 +81,48 @@
       }
 
       main {
-        display: grid;
-        gap: 16px;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding-bottom: 4px;
       }
 
-      @media (min-width: 960px) {
-        main {
-          grid-template-columns: 360px 1fr;
-        }
+      /* New Layout Classes */
+      .layout-container {
+        display: flex;
+        gap: 16px;
+        height: 100%;
+        overflow: hidden;
+        align-items: stretch;
       }
+
+      .layout-sidebar {
+        width: 360px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+        padding-right: 4px;
+        /* Space for scrollbar */
+        flex-shrink: 0;
+        scrollbar-width: thin;
+      }
+
+      .layout-content {
+        flex: 1;
+        min-width: 0;
+        /* Prevent flex overflow */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* 
+       * Overwrite previous grid responsive logic for main 
+       * since we now manage structure manually 
+       */
 
       .card {
         background: var(--card-bg);
@@ -85,6 +130,7 @@
         border-radius: 14px;
         padding: 14px;
         box-shadow: var(--shadow-sm);
+        flex-shrink: 0;
       }
 
       .card h2 {
@@ -95,6 +141,7 @@
         gap: 8px;
       }
 
+      /* ... form styles ... */
       label {
         font-size: 0.82rem;
         font-weight: 600;
@@ -123,6 +170,7 @@
         box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
       }
 
+      /* ... button styles ... */
       .button,
       button {
         appearance: none;
@@ -175,6 +223,7 @@
         gap: 16px;
       }
 
+      /* ... log styles ... */
       .player-log-controls {
         display: flex;
         align-items: center;
@@ -277,6 +326,7 @@
         flex-wrap: wrap;
         gap: 16px;
         align-items: baseline;
+        flex-shrink: 0;
       }
 
       .result-header h2 {
@@ -297,34 +347,48 @@
         color: var(--accent);
       }
 
+      /* 
+       * Result body updated to support scrolling within the container 
+       */
       .result-body {
-        display: grid;
-        gap: 22px;
-      }
-
-      .result-main {
-        width: 100%;
-      }
-
-      .result-details {
-        width: 100%;
+        display: block;
+        /* Flex item behavior handled by container */
       }
 
       @media (min-width: 960px) {
+
+        /* Remove the complex grid for result body to simplify scrolling. 
+           Instead, let content flow or use flex if side-by-side needed.
+           Given user wants "everything to fit", stacking vertically inside right col 
+           is safer unless we have lots of horizontal space. 
+           But if we want Player | Details side-by-side, we need flex row. 
+        */
         .result-body {
-          grid-template-columns: 1fr minmax(0, 720px) 1fr;
-          align-items: start;
+          display: flex;
+          gap: 20px;
+          height: 100%;
         }
 
         .result-main {
-          grid-column: 2;
+          flex: 2;
+          min-height: 0;
+          overflow-y: auto;
+          padding-right: 8px;
         }
 
         .result-details {
-          grid-column: 3;
-          align-self: start;
-          max-width: 320px;
-          margin-left: auto;
+          flex: 1;
+          min-height: 0;
+          overflow-y: auto;
+          max-width: 400px;
+          /* Details usually closed, but if open, scrolling independently is nice */
+          margin-left: 0;
+          align-self: stretch;
+          border-left: 1px solid rgba(0, 0, 0, 0.05);
+          padding-left: 16px;
+          border-top: none;
+          padding-top: 0;
+          margin-top: 0;
         }
       }
 
@@ -386,15 +450,19 @@
       }
 
       footer {
-        padding-top: 0;
-        padding-bottom: 40px;
+        flex-shrink: 0;
+        padding-top: 12px;
+        padding-bottom: 12px;
         text-align: center;
         font-size: 0.78rem;
         color: rgba(15, 23, 42, 0.7);
+        background: rgba(255, 255, 255, 0.4);
       }
 
       /* Recognition Log Styles */
       .recognition-log-container {
+        /* Flex item in sidebar card? Card is flex container if we want. */
+        /* Currently sidebar is flex column of cards. Card is normal block. */
         background: rgba(255, 255, 255, 0.72);
         border-radius: 12px;
         padding: 12px;

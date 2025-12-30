@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RPG Auto-DJ</title>
-  <link rel="stylesheet" href="/static/css/ui.css" />
+  <link rel="stylesheet" href="/static/css/ui.css?v=2" />
 
 </head>
 
@@ -21,117 +21,124 @@
   </header>
 
   <main>
-    <section class="card">
-      <h2>Жанр и сцены</h2>
-      <div class="form-grid">
-        <div>
-          <label for="genre-select">Жанр кампании</label>
-          <select id="genre-select"></select>
-        </div>
-        <div>
-          <label for="scene-select">Сцена</label>
-          <select id="scene-select"></select>
-        </div>
-        <div class="form-actions">
-          <button id="search-button" type="button">Подобрать музыку</button>
-          <span class="status" id="search-status">Выберите сцену, чтобы получить ссылки на плейлисты.</span>
-        </div>
-      </div>
-
-      <h2>Быстрый выбор сцены</h2>
-      <div class="scene-list" id="scene-buttons"></div>
-    </section>
-
-    <section class="card">
-      <div class="result-card">
-        <p class="status" id="result-status">Здесь появится подборка плейлистов для вашей сцены.</p>
-        <div id="result-container" class="hidden">
-          <div class="result-header">
-            <h2 id="result-title">Текущая сцена</h2>
-            <span class="pill" id="result-genre"></span>
-            <span class="pill" id="result-scene"></span>
-            <span class="pill hidden" id="result-confidence"></span>
-          </div>
-          <div class="result-body">
-            <div class="info-block result-main">
-              <h3>Плеер</h3>
-              <div id="player"
-                style="width:100%;aspect-ratio:16/9;background:rgba(0,0,0,0.06);border-radius:12px;overflow:hidden">
-              </div>
-              <div class="form-actions" style="margin-top:10px">
-                <button id="player-play" type="button" class="secondary">▶️ Play</button>
-                <button id="player-pause" type="button" class="secondary">⏸ Pause</button>
-                <label style="margin-left:8px">Громкость <input id="player-volume" type="range" min="0" max="100"
-                    value="70" style="vertical-align:middle" /></label>
-              </div>
-              <div class="form-actions" style="margin-top:6px">
-                <label>Провайдер
-                  <select id="provider-select" style="margin-left:8px"></select>
-                </label>
-                <button id="provider-open" type="button" class="secondary">🔗 Открыть</button>
-              </div>
-              <p class="status" id="player-status">Совет: нажмите Play один раз, чтобы разрешить автоплей.</p>
+    <div class="layout-container">
+      <div class="layout-sidebar">
+        <section class="card">
+          <h2>Жанр и сцены</h2>
+          <div class="form-grid">
+            <div>
+              <label for="genre-select">Жанр кампании</label>
+              <select id="genre-select"></select>
             </div>
-
-            <!-- Technical details - collapsed by default -->
-            <details class="info-block result-details">
-              <summary>🔧 Технические детали</summary>
-              <div style="margin-top:12px">
-                <h4>Плейлисты</h4>
-                <ul class="playlist-list" id="playlist-list"></ul>
-
-                <div class="player-log-controls" style="margin-top:12px">
-                  <span class="player-log-title">Журнал плеера</span>
-                  <button id="player-log-clear" type="button" class="secondary small">Очистить</button>
-                </div>
-                <div id="player-log" class="player-log" aria-live="polite"></div>
-
-                <h4 style="margin-top:12px">Поисковый запрос</h4>
-                <p id="result-query" class="status"></p>
-
-                <h4 style="margin-top:12px">Антидребезг</h4>
-                <ul class="info-list" id="hysteresis-list"></ul>
-
-                <h4 style="margin-top:12px">Детали сцены</h4>
-                <ul class="info-list" id="scene-config"></ul>
-                <div id="result-tags" class="status hidden"></div>
-                <div id="result-reason" class="status hidden"></div>
-              </div>
-            </details>
+            <div>
+              <label for="scene-select">Сцена</label>
+              <select id="scene-select"></select>
+            </div>
+            <div class="form-actions">
+              <button id="search-button" type="button">Подобрать музыку</button>
+              <span class="status" id="search-status">Выберите сцену, чтобы получить ссылки на плейлисты.</span>
+            </div>
           </div>
-        </div>
-      </div>
-    </section>
 
-    <section class="card">
-      <h2>Автоподбор по тегам</h2>
-      <div class="form-grid">
-        <div>
-          <label for="recommend-genre">Жанр</label>
-          <select id="recommend-genre"></select>
-        </div>
-        <div>
-          <label for="recommend-tags">Теги (через запятую)</label>
-          <input id="recommend-tags" type="text" placeholder="battle, dragons" />
-        </div>
-        <div class="form-actions">
-          <button id="recommend-button" type="button">Рекомендовать сцену</button>
-          <button id="mic-toggle" type="button" class="secondary">🎙 Микрофон</button>
-          <button id="whisper-toggle" type="button" class="secondary">🧠 Whisper</button>
-        </div>
+          <h2>Быстрый выбор сцены</h2>
+          <div class="scene-list" id="scene-buttons"></div>
+        </section>
+
+        <section class="card">
+          <h2>Автоподбор по тегам</h2>
+          <div class="form-grid">
+            <div>
+              <label for="recommend-genre">Жанр</label>
+              <select id="recommend-genre"></select>
+            </div>
+            <div>
+              <label for="recommend-tags">Теги (через запятую)</label>
+              <input id="recommend-tags" type="text" placeholder="battle, dragons" />
+            </div>
+            <div class="form-actions">
+              <button id="recommend-button" type="button">Рекомендовать сцену</button>
+              <button id="mic-toggle" type="button" class="secondary">🎙 Микрофон</button>
+              <button id="whisper-toggle" type="button" class="secondary">🧠 Whisper</button>
+            </div>
+          </div>
+
+          <!-- Лента логов распознавания -->
+          <div class="recognition-log-container" style="margin-top: 16px;">
+            <div class="recognition-log-header">
+              <span class="recognition-log-title">📋 Журнал распознавания</span>
+              <button id="recognition-log-clear" type="button" class="secondary small">Очистить</button>
+            </div>
+            <div id="recognition-log" class="recognition-log" aria-live="polite">
+              <div class="log-entry info">Готово к работе. Нажмите "Микрофон" или "Whisper" для начала.</div>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <!-- Лента логов распознавания -->
-      <div class="recognition-log-container" style="margin-top: 16px;">
-        <div class="recognition-log-header">
-          <span class="recognition-log-title">📋 Журнал распознавания</span>
-          <button id="recognition-log-clear" type="button" class="secondary small">Очистить</button>
-        </div>
-        <div id="recognition-log" class="recognition-log" aria-live="polite">
-          <div class="log-entry info">Готово к работе. Нажмите "Микрофон" или "Whisper" для начала.</div>
-        </div>
+      <div class="layout-content">
+        <section class="card" style="height: 100%; display: flex; flex-direction: column;">
+          <div class="result-card" style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+            <p class="status" id="result-status">Здесь появится подборка плейлистов для вашей сцены.</p>
+            <div id="result-container" class="hidden"
+              style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+              <div class="result-header">
+                <h2 id="result-title">Текущая сцена</h2>
+                <span class="pill" id="result-genre"></span>
+                <span class="pill" id="result-scene"></span>
+                <span class="pill hidden" id="result-confidence"></span>
+              </div>
+              <div class="result-body" style="flex: 1; min-height: 0; overflow-y: auto;">
+                <div class="info-block result-main">
+                  <h3>Плеер</h3>
+                  <div id="player"
+                    style="width:100%;aspect-ratio:16/9;background:rgba(0,0,0,0.06);border-radius:12px;overflow:hidden">
+                  </div>
+                  <div class="form-actions" style="margin-top:10px">
+                    <button id="player-play" type="button" class="secondary">▶️ Play</button>
+                    <button id="player-pause" type="button" class="secondary">⏸ Pause</button>
+                    <label style="margin-left:8px">Громкость <input id="player-volume" type="range" min="0" max="100"
+                        value="70" style="vertical-align:middle" /></label>
+                  </div>
+                  <div class="form-actions" style="margin-top:6px">
+                    <label>Провайдер
+                      <select id="provider-select" style="margin-left:8px"></select>
+                    </label>
+                    <button id="provider-open" type="button" class="secondary">🔗 Открыть</button>
+                  </div>
+                  <p class="status" id="player-status">Совет: нажмите Play один раз, чтобы разрешить автоплей.</p>
+                </div>
+
+                <!-- Technical details - collapsed by default -->
+                <details class="info-block result-details">
+                  <summary>🔧 Технические детали</summary>
+                  <div style="margin-top:12px">
+                    <h4>Плейлисты</h4>
+                    <ul class="playlist-list" id="playlist-list"></ul>
+
+                    <div class="player-log-controls" style="margin-top:12px">
+                      <span class="player-log-title">Журнал плеера</span>
+                      <button id="player-log-clear" type="button" class="secondary small">Очистить</button>
+                    </div>
+                    <div id="player-log" class="player-log" aria-live="polite"></div>
+
+                    <h4 style="margin-top:12px">Поисковый запрос</h4>
+                    <p id="result-query" class="status"></p>
+
+                    <h4 style="margin-top:12px">Антидребезг</h4>
+                    <ul class="info-list" id="hysteresis-list"></ul>
+
+                    <h4 style="margin-top:12px">Детали сцены</h4>
+                    <ul class="info-list" id="scene-config"></ul>
+                    <div id="result-tags" class="status hidden"></div>
+                    <div id="result-reason" class="status hidden"></div>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
   </main>
 
   <footer>
